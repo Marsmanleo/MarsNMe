@@ -1,0 +1,26 @@
+[Unit]
+Description=Mars Memory MCP Gateway (%i)
+After=network-online.target docker.service
+Wants=network-online.target
+Requires=docker.service
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/mars-memory-mcp/current-%i/soul-memory
+EnvironmentFile=-/opt/mars-memory-mcp/shared/.env
+EnvironmentFile=-/opt/mars-memory-mcp/shared/.env.%i
+EnvironmentFile=-/opt/mars-memory-mcp/current-%i/soul-memory/.env
+EnvironmentFile=-/opt/mars-memory-mcp/current-%i/soul-memory/.env.%i
+EnvironmentFile=-/opt/mars-memory-mcp/current/soul-memory/.env
+EnvironmentFile=-/opt/mars-memory-mcp/current/soul-memory/.env.%i
+Environment=MCP_PROFILE=%i
+Environment=MCP_REQUIRE_BEARER=true
+Environment=JINA_EMBEDDING_API_URL=https://api.jina.ai/v1/embeddings
+Environment=JINA_EMBEDDING_MODEL=jina-embeddings-v3
+Environment=JINA_EMBEDDING_DIMENSIONS=1024
+ExecStart=/usr/bin/node /opt/mars-memory-mcp/current-%i/soul-memory/server.mjs
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
