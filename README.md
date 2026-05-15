@@ -35,6 +35,7 @@ One codebase (`soul-memory/server.mjs`) serves both `coco` and `toto` profiles t
 ## Repository layout
 - `soul-memory/server.mjs` — gateway entry point
 - `soul-memory/scripts/hermes_digest_runner.py` — optional digest runner
+- `soul-memory/scripts/dream_runner.py` — public self-host dream runner
 - `soul-memory/deploy/systemd/` — systemd templates
 - `soul-memory/deploy/phase2/` — build/deploy scripts
 - `soul-memory/deploy/phase3/smoke_gate.sh` — smoke gate script
@@ -59,6 +60,21 @@ Hermes is optional and disabled by default:
 - `HERMES_DIGEST_MCP_BEARER_TOKEN`
 - `HERMES_DIGEST_ORIGIN`
 - `HERMES_DIGEST_SOURCE_DIR`
+
+### Optional Dream Runner (self-host)
+Dream Runner is public-friendly and can run without Hermes private environment:
+- `DREAM_ENABLED=true`
+- `DREAM_MODE=lite|standard|pro`
+- `DREAM_DIGEST_MCP_URL`
+- `DREAM_MCP_BEARER_TOKEN` (if required)
+- `DREAM_ENABLE_ISSUE_SIGNALS`, `DREAM_ENABLE_REPO_SCAN`, `DREAM_ENABLE_SOUL_CONTEXT` (optional overrides)
+
+Quick start:
+```bash
+DREAM_ENABLED=true DREAM_MODE=lite python3 soul-memory/scripts/dream_runner.py
+```
+
+See `docs/dream-runner-self-host.md` for full configuration.
 
 ## Local run
 ```bash
