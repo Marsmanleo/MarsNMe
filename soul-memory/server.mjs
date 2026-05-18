@@ -3356,7 +3356,7 @@ async function callTool(name, args = {}) {
       };
     }
     if (toolName === 'reload_source_registry') {
-      return reloadSourceRegistryCache({ manual: true });
+      return await reloadSourceRegistryCache({ manual: true });
     }
 
     if (toolName === 'recall') {
@@ -3445,7 +3445,7 @@ async function callTool(name, args = {}) {
       };
     }
     if (toolName === 'explain_memory') {
-      return runExplainMemory(args);
+      return await runExplainMemory(args);
     }
     if (toolName === 'demote_memory') {
       const chunkId = normalizeOptionalUuid(args.id, 'id');
@@ -3587,17 +3587,17 @@ async function callTool(name, args = {}) {
     }
 
     if (toolName === 'health_check') {
-      return runHealthCheck(args);
+      return await runHealthCheck(args);
     }
     if (toolName === 'session_boot') {
-      return runDailyBoot(args);
+      return await runDailyBoot(args);
     }
     if (toolName === 'session_close') {
-      return runDailyClose(args);
+      return await runDailyClose(args);
     }
 
     if (toolName === 'dream_ingest') {
-      return ingestMarsvaultChunks(args, {
+      return await ingestMarsvaultChunks(args, {
         defaultType: 'digest',
         defaultSourceFile: 'Hermes/Digest/auto.md',
         defaultSectionPrefix: 'digest',
