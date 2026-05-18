@@ -7,14 +7,109 @@ MarsNMe is built on a symbiosis philosophy: shared memory should strengthen trus
 An agent-agnostic, LLM-agnostic memory backend for MCP-compatible tools.
 
 # MarsNMe (repository: mars-memory-mcp)
+## Quick Start (5 minutes)
+This is the fastest first-run path.  
+It follows the same tools-first flow as `docs/onboarding-a-mcp-zero-to-recall.md` and `docs/onboarding-b-platform-skill-install.md`.
+
+1. Clone and install:
+```bash
+git clone https://github.com/Marsmanleo/MarsNMe.git
+cd MarsNMe
+npm --prefix soul-memory install
+```
+2. Copy environment template:
+```bash
+cp .env.example .env
+```
+3. Fill required values in `.env`:
+   - `SUPABASE_BASE_URL`
+   - `SUPABASE_SERVICE_ROLE_KEY`
+   - `JINA_API_KEY`
+4. Start gateway:
+```bash
+MCP_PROFILE=profile-a node soul-memory/server.mjs
+```
+5. Verify health:
+```bash
+curl -sS http://127.0.0.1:18790/health
+```
+6. Connect your MCP client (next section), then run the first round-trip check.
+
+## MCP Client Connection Guide
+Local endpoint:
+- `http://127.0.0.1:18790/mcp`
+
+If bearer auth is enabled (`MCP_REQUIRE_BEARER=true`), include:
+- `Authorization: Bearer <your-token>`
+
+### Claude Desktop
+1. Open `claude_desktop_config.json` (macOS default path: `~/Library/Application Support/Claude/claude_desktop_config.json`).
+2. Add/update:
+```json
+{
+  "mcpServers": {
+    "marsnme-local": {
+      "url": "http://127.0.0.1:18790/mcp"
+    }
+  }
+}
+```
+3. Restart Claude Desktop.
+
+### Cursor
+1. Open Cursor Settings and search for MCP.
+2. Add a new server:
+   - Name: `marsnme-local`
+   - URL: `http://127.0.0.1:18790/mcp`
+   - Headers: optional bearer header if enabled
+3. Reconnect MCP in Cursor.
+
+### Warp
+1. Open `Settings > Agents > MCP servers`.
+2. Add a server pointing to:
+   - URL: `http://127.0.0.1:18790/mcp`
+3. Add optional bearer header if required, then reconnect.
+
+### Any MCP client (generic HTTP/SSE)
+Use a streamable HTTP/SSE MCP entry:
+```json
+{
+  "marsnme-local": {
+    "url": "http://127.0.0.1:18790/mcp"
+  }
+}
+```
+
+## First Connection Validation (Round Trip)
+After client connection, verify this sequence once:
+
+1. `tools/list`:
+```bash
+curl -sS http://127.0.0.1:18790/mcp \
+  -H 'content-type: application/json' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}'
+```
+2. `insert_memory`:
+```bash
+curl -sS http://127.0.0.1:18790/mcp \
+  -H 'content-type: application/json' \
+  -d '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"insert_memory","arguments":{"body":"quickstart memory check","source":"warp","session_id":"quickstart-smoke"}}}'
+```
+3. `recall`:
+```bash
+curl -sS http://127.0.0.1:18790/mcp \
+  -H 'content-type: application/json' \
+  -d '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"recall","arguments":{"query":"quickstart memory check","limit":3}}}'
+```
 
 ## What this repository is
 `mars-memory-mcp` is the core MCP gateway repository behind the public-facing MarsNMe release.  
-One codebase (`soul-memory/server.mjs`) serves both `coco` and `toto` profiles through `MCP_PROFILE`.
+One codebase (`soul-memory/server.mjs`) serves multiple profile schemas through `MCP_PROFILE`.
+This public repository currently keeps two built-in legacy profile IDs (`coco`, `toto`) for backward compatibility.
 
 ## Current capabilities
 - MCP methods: `initialize`, `notifications/initialized`, `tools/list`, `tools/call`, `ping`
-- Profiles: `coco` and `toto` (same server, profile-scoped behavior)
+- Profiles: configurable profile IDs (legacy built-ins: `coco`, `toto`)
 - Memory tools:
   - `insert_memory` (short-term memory)
   - `list_memories`
@@ -44,7 +139,7 @@ One codebase (`soul-memory/server.mjs`) serves both `coco` and `toto` profiles t
 ## Environment setup
 1. Copy `.env.example` to your local `.env` (do not commit real secrets).
 2. Fill required values:
-   - `MCP_PROFILE` (`coco` or `toto`)
+   - `MCP_PROFILE` (your profile identifier; this repo ships with legacy `coco`/`toto`)
    - `SUPABASE_BASE_URL`
    - `SUPABASE_SERVICE_ROLE_KEY`
    - `JINA_API_KEY`
@@ -73,15 +168,26 @@ Quick start:
 ```bash
 DREAM_ENABLED=true DREAM_MODE=lite python3 soul-memory/scripts/dream_runner.py
 ```
+If you run this repository with bundled defaults and no profile remapping, use `coco` and `toto`.
 
 See `docs/dream-runner-self-host.md` for full configuration.
 
+## Onboarding
+- Zero-to-first-recall guide: `docs/onboarding-a-mcp-zero-to-recall.md`
+- Platform install guide (optional skill layer): `docs/onboarding-b-platform-skill-install.md`
+
+## Skill library
+- Skill index and update workflow: `skills/README.md`
+- Perplexity template: `skills/perplexity/memory-daily-boot/SKILL.md`
+- Cursor template: `skills/cursor/memory-daily-boot/rule.mdc`
+- Warp template: `skills/warp/memory-daily-boot/prompt.md`
+
 ## Local run
 ```bash
-MCP_PROFILE=coco node soul-memory/server.mjs
+MCP_PROFILE=profile-a node soul-memory/server.mjs
 ```
 ```bash
-MCP_PROFILE=toto node soul-memory/server.mjs
+MCP_PROFILE=profile-b node soul-memory/server.mjs
 ```
 
 Health endpoints:
@@ -90,13 +196,13 @@ Health endpoints:
 
 ## Systemd deployment
 Use `soul-memory/deploy/systemd/memory-mcp-gateway@.service` with instances:
-- `memory-mcp-gateway@coco.service`
-- `memory-mcp-gateway@toto.service`
+- `memory-mcp-gateway@profile-a.service`
+- `memory-mcp-gateway@profile-b.service`
 
 Recommended env files:
 - `/opt/mars-memory-mcp/shared/.env`
-- `/opt/mars-memory-mcp/shared/.env.coco`
-- `/opt/mars-memory-mcp/shared/.env.toto`
+- `/opt/mars-memory-mcp/shared/.env.profile-a`
+- `/opt/mars-memory-mcp/shared/.env.profile-b`
 
 ## Release/deploy scripts
 1. Build artifact:

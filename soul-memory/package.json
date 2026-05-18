@@ -1,8 +1,22 @@
 {
-  "name": "mars-memory-mcp",
-  "version": "0.1.0",
-  "private": true,
-  "description": "Mars memory MCP gateway for MarsVault (current CoCo profile)",
+  "name": "@marsnme/mcp-gateway",
+  "version": "0.1.1",
+  "private": false,
+  "description": "Agent-agnostic, LLM-agnostic memory backend for MCP-compatible tools",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Marsmanleo/MarsNMe.git"
+  },
+  "author": "Mars Group",
+  "keywords": [
+    "mcp",
+    "memory",
+    "ai",
+    "symbiosis",
+    "embedding",
+    "supabase"
+  ],
   "type": "module",
   "scripts": {
     "start": "node server.mjs"

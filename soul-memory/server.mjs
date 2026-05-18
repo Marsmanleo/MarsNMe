@@ -57,12 +57,86 @@ if (!PROFILE) {
 
 const DB_PROFILE = PROFILE.schema;
 const SERVER_NAME = `${PROFILE.schema}-memory-mcp`;
-const SOURCE_VALIDATION_MESSAGE = `source must be one of ${PROFILE.sourceWhitelist.join('/')}`;
 const RECALL_BODY_VALIDATION_MESSAGE = `body must be one of ${PROFILE.recallBodyEnum.join('/')}`;
+const SOURCE_NAME_PATTERN = /^[a-z][a-z0-9_-]{1,31}$/;
+const SOURCE_MODE_VALUES = new Set(['core', 'extended', 'registry']);
+const CORE_SOURCE_LIST = PROFILE.sourceWhitelist.slice();
+const CORE_SOURCE_WHITELIST = new Set(CORE_SOURCE_LIST);
+const CORE_SOURCE_VALIDATION_MESSAGE =
+  `source must be one of ${CORE_SOURCE_LIST.join('/')}`;
+function normalizeSourceName(value, fieldName = 'source') {
+  const normalized = String(value || '')
+    .trim()
+    .toLowerCase();
+  if (!normalized) return '';
+  if (!SOURCE_NAME_PATTERN.test(normalized)) {
+    throw new Error(`${fieldName} must match ^[a-z][a-z0-9_-]{1,31}$`);
+  }
+  return normalized;
+}
+function parseExtraSourceList(rawValue) {
+  const raw = String(rawValue || '').trim();
+  if (!raw) return [];
+  const extras = [];
+  const seen = new Set();
+  const entries = raw.split(',');
+  for (const entry of entries) {
+    const source = normalizeSourceName(entry, 'MCP_EXTRA_SOURCES entry');
+    if (!source) continue;
+    if (CORE_SOURCE_WHITELIST.has(source) || seen.has(source)) continue;
+    seen.add(source);
+    extras.push(source);
+  }
+  return extras;
+}
+const SOURCE_MODE_RAW = String(process.env.MCP_SOURCE_MODE || 'core')
+  .trim()
+  .toLowerCase();
+if (SOURCE_MODE_RAW && !SOURCE_MODE_VALUES.has(SOURCE_MODE_RAW)) {
+  console.warn(
+    `[config] invalid MCP_SOURCE_MODE=${SOURCE_MODE_RAW}; fallback to core`
+  );
+}
+const SOURCE_MODE = SOURCE_MODE_VALUES.has(SOURCE_MODE_RAW)
+  ? SOURCE_MODE_RAW
+  : 'core';
+const EXTRA_SOURCE_LIST =
+  SOURCE_MODE === 'extended'
+    ? parseExtraSourceList(process.env.MCP_EXTRA_SOURCES || '')
+    : [];
+const SOURCE_REGISTRY_TABLE = 'source_registry';
+const SOURCE_REGISTRY_SELECT_COLUMNS = 'source,enabled';
+const SOURCE_REGISTRY_CACHE = {
+  loaded: false,
+  loaded_at: null,
+  enabled_sources: [],
+  last_error: ''
+};
+let MEMORY_SOURCE_LIST = CORE_SOURCE_LIST.slice();
+let MEMORY_SOURCE_WHITELIST = new Set(MEMORY_SOURCE_LIST);
+let MEMORY_SOURCE_VALIDATION_MESSAGE =
+  `source must be one of ${MEMORY_SOURCE_LIST.join('/')}`;
+
+function buildMemorySourceListForMode(registryEnabledSources = []) {
+  if (SOURCE_MODE === 'extended') {
+    return Array.from(new Set([...CORE_SOURCE_LIST, ...EXTRA_SOURCE_LIST]));
+  }
+  if (SOURCE_MODE === 'registry') {
+    return Array.from(new Set([...CORE_SOURCE_LIST, ...registryEnabledSources]));
+  }
+  return CORE_SOURCE_LIST.slice();
+}
+function setMemorySourceWhitelist(nextSources) {
+  const sourceList = Array.from(new Set(Array.isArray(nextSources) ? nextSources : []));
+  MEMORY_SOURCE_LIST = sourceList;
+  MEMORY_SOURCE_WHITELIST = new Set(sourceList);
+  MEMORY_SOURCE_VALIDATION_MESSAGE =
+    `source must be one of ${MEMORY_SOURCE_LIST.join('/')}`;
+}
+setMemorySourceWhitelist(buildMemorySourceListForMode());
 
 const PORT = Number.parseInt(process.env.PORT || String(PROFILE.defaultPort), 10);
 const SUPABASE_BASE_URL = process.env.SUPABASE_BASE_URL || 'http://127.0.0.1:8100';
-const SOURCE_WHITELIST = new Set(PROFILE.sourceWhitelist);
 const OAUTH_ENABLED = process.env.MCP_OAUTH_ENABLED !== 'false';
 const REQUIRE_BEARER = process.env.MCP_REQUIRE_BEARER === 'true';
 const BYPASS_BEARER_FOR_PRIVATE = process.env.MCP_BYPASS_BEARER_FOR_PRIVATE !== 'false';
@@ -119,8 +193,31 @@ const DAILY_BOOT_QUERY_DEFAULTS = {
   }
 };
 const DAILY_BOOT_STATUS_QUERY_SUFFIX = '最新狀態 本週任務';
+const MEMORY_SCOPE_VALUES = new Set(['this_body', 'all_bodies']);
+const SOURCE_TO_AGENT_BODY_MAP = new Map([
+  ['perplexity', 'perplexity-web'],
+  ['cursor', 'cursor'],
+  ['warp', 'warp'],
+  ['openclaw', 'desktop'],
+  ['hermes', 'desktop']
+]);
+const DEFAULT_AGENT_BODY = String(process.env.MCP_AGENT_BODY || '')
+  .trim()
+  .toLowerCase();
+const DEFAULT_ENVIRONMENT = String(process.env.MCP_ENVIRONMENT || 'desktop')
+  .trim()
+  .toLowerCase();
 const MEMORY_SELECT_COLUMNS =
-  'id,body,source,session_id,tags,promoted,promoted_at,created_at,expires_at';
+  'id,body,source,session_id,tags,agent_body,environment,promoted,promoted_at,created_at,expires_at';
+const TOOL_USAGE_INSERT_SELECT_COLUMNS =
+  'id,tool_name,timestamp,latency_ms,tokens_estimate,agent_body';
+const TOOL_USAGE_TOKEN_CHAR_CAP = 400000;
+const TOOL_USAGE_INGEST_NAMES = new Set([
+  'dream_ingest',
+  PROFILE.memoryIngestToolName,
+  ...PROFILE.memoryIngestLegacyToolNames,
+  'ingest_marsvault_digest'
+]);
 function buildMemoryIngestOriginSchema() {
   if (Array.isArray(PROFILE.memoryIngestOriginEnum) && PROFILE.memoryIngestOriginEnum.length > 0) {
     return {
@@ -135,6 +232,19 @@ function buildMemoryIngestOriginSchema() {
     default: PROFILE.memoryIngestDefaultOrigin
   };
 }
+function buildMemorySourceSchema() {
+  if (SOURCE_MODE === 'registry') {
+    return {
+      type: 'string',
+      description:
+        `Source key validated against core sources + enabled entries in ${DB_PROFILE}.${SOURCE_REGISTRY_TABLE}`
+    };
+  }
+  return {
+    type: 'string',
+    enum: MEMORY_SOURCE_LIST
+  };
+}
 
 function buildTools() {
   return [
@@ -145,7 +255,7 @@ function buildTools() {
         type: 'object',
         properties: {
           body: { type: 'string', description: 'Memory content text' },
-          source: { type: 'string', enum: PROFILE.sourceWhitelist },
+          source: buildMemorySourceSchema(),
           session_id: { type: 'string', description: 'Session trace id' },
           tags: {
             type: 'array',
@@ -155,6 +265,14 @@ function buildTools() {
           expires_at: {
             type: 'string',
             description: 'Optional ISO timestamp override'
+          },
+          agent_body: {
+            type: 'string',
+            description: 'Optional body label (default inferred from source)'
+          },
+          environment: {
+            type: 'string',
+            description: 'Optional environment label (default from MCP_ENVIRONMENT)'
           }
         },
         required: ['body', 'source', 'session_id'],
@@ -168,7 +286,7 @@ function buildTools() {
         type: 'object',
         properties: {
           limit: { type: 'number', minimum: 1, maximum: 100, default: 20 },
-          source: { type: 'string', enum: PROFILE.sourceWhitelist },
+          source: buildMemorySourceSchema(),
           unexpired_only: { type: 'boolean', default: true }
         },
         additionalProperties: false
@@ -182,11 +300,30 @@ function buildTools() {
         properties: {
           query: { type: 'string', description: 'Semantic search query text' },
           limit: { type: 'number', minimum: 1, maximum: 100, default: 20 },
-          source: { type: 'string', enum: PROFILE.sourceWhitelist },
+          source: buildMemorySourceSchema(),
           unexpired_only: { type: 'boolean', default: true },
-          min_similarity: { type: 'number', minimum: -1, maximum: 1 }
+          min_similarity: { type: 'number', minimum: -1, maximum: 1 },
+          scope: { type: 'string', enum: ['this_body', 'all_bodies'], default: 'this_body' },
+          agent_body: {
+            type: 'string',
+            description: 'Optional body scope key; defaults to source/body/env inference'
+          },
+          environment: {
+            type: 'string',
+            description: 'Optional environment filter'
+          }
         },
         required: ['query'],
+        additionalProperties: false
+      }
+    },
+    {
+      name: 'reload_source_registry',
+      description:
+        `Reload enabled sources cache from ${DB_PROFILE}.${SOURCE_REGISTRY_TABLE} (effective when MCP_SOURCE_MODE=registry)`,
+      inputSchema: {
+        type: 'object',
+        properties: {},
         additionalProperties: false
       }
     },
@@ -203,7 +340,21 @@ function buildTools() {
           include_shared: { type: 'boolean', default: true },
           include_private: { type: 'boolean', default: true },
           type: { type: 'string', description: 'Optional chunk type filter' },
-          min_similarity: { type: 'number', minimum: -1, maximum: 1 }
+          min_similarity: { type: 'number', minimum: -1, maximum: 1 },
+          scope: { type: 'string', enum: ['this_body', 'all_bodies'], default: 'this_body' },
+          agent_body: {
+            type: 'string',
+            description: 'Optional body scope key; defaults to MCP_AGENT_BODY when present'
+          },
+          environment: {
+            type: 'string',
+            description: 'Optional environment filter'
+          },
+          debug_explain: {
+            type: 'boolean',
+            default: false,
+            description: 'Include query/hit token overlap debug details'
+          }
         },
         required: ['query'],
         additionalProperties: false
@@ -284,6 +435,20 @@ function buildTools() {
             maximum: 20,
             default: 6,
             description: 'Nearest neighbors compared per chunk in conflict detection'
+          },
+          forget_candidate_days: {
+            type: 'number',
+            minimum: 3,
+            maximum: 180,
+            default: 14,
+            description: 'Only suggest forget candidates older than this number of days'
+          },
+          forget_candidate_limit: {
+            type: 'number',
+            minimum: 1,
+            maximum: 50,
+            default: 10,
+            description: 'Maximum forget candidates returned by health_check'
           }
         },
         additionalProperties: false
@@ -427,9 +592,89 @@ function buildTools() {
             type: 'string',
             description: 'Optional short-memory id to link promoted long-memory chunks'
           },
+          source_session_id: {
+            type: 'string',
+            description: 'Optional source session id for provenance'
+          },
+          source_tool: {
+            type: 'string',
+            enum: PROFILE.sourceWhitelist,
+            description: 'Optional source tool for provenance'
+          },
+          source_user_note: {
+            type: 'string',
+            description: 'Optional user note describing why this memory was promoted'
+          },
+          agent_body: {
+            type: 'string',
+            description: 'Optional body label for memory boundary'
+          },
+          environment: {
+            type: 'string',
+            description: 'Optional environment label'
+          },
           max_chunk_chars: { type: 'number', minimum: 300, maximum: 3000, default: 1200 }
         },
         required: ['content'],
+        additionalProperties: false
+      }
+    },
+    {
+      name: 'demote_memory',
+      description: `Mark a long-memory chunk as deprecated/superseded in ${DB_PROFILE}.marsvault_chunks`,
+      inputSchema: {
+        type: 'object',
+        properties: {
+          id: { type: 'string', description: 'Long-memory chunk id (UUID)' },
+          deprecated_reason: { type: 'string', description: 'Reason for deprecation' },
+          superseded_by: {
+            type: 'string',
+            description: 'Optional replacement chunk id (UUID) when this memory is superseded'
+          },
+          deprecated_at: {
+            type: 'string',
+            description: 'Optional ISO timestamp override; defaults to now'
+          }
+        },
+        required: ['id', 'deprecated_reason'],
+        additionalProperties: false
+      }
+    },
+    {
+      name: 'soft_forget',
+      description: `Expire short-memory rows early in ${DB_PROFILE}.memories (manual cleanup without hard delete)`,
+      inputSchema: {
+        type: 'object',
+        properties: {
+          ids: {
+            type: 'array',
+            items: { type: 'string' },
+            minItems: 1,
+            maxItems: 50,
+            description: 'Short-memory IDs (UUID) to expire immediately'
+          },
+          reason: {
+            type: 'string',
+            description: 'Optional note for why these memories are being soft-forgotten'
+          },
+          forgotten_at: {
+            type: 'string',
+            description: 'Optional ISO timestamp override; defaults to now'
+          }
+        },
+        required: ['ids'],
+        additionalProperties: false
+      }
+    },
+    {
+      name: 'explain_memory',
+      description: `Explain provenance of a long-memory chunk in ${DB_PROFILE}.marsvault_chunks (source memory/session/tool/timeline)`,
+      inputSchema: {
+        type: 'object',
+        properties: {
+          id: { type: 'string', description: 'Long-memory chunk id (UUID)' }
+        },
+        required: ['id'],
         additionalProperties: false
       }
     }
@@ -692,6 +937,111 @@ async function supabaseRequest(path, options = {}) {
   return parsed;
 }
 
+function validateMemorySource(value, options = {}) {
+  const required = options.required !== false;
+  const source = String(value || '').trim();
+  if (!source) {
+    if (required) {
+      throw new Error('source is required');
+    }
+    return '';
+  }
+  if (MEMORY_SOURCE_WHITELIST.has(source)) {
+    return source;
+  }
+  if (SOURCE_MODE === 'registry') {
+    if (!SOURCE_NAME_PATTERN.test(source)) {
+      throw new Error('source must match ^[a-z][a-z0-9_-]{1,31}$');
+    }
+    throw new Error(
+      `source '${source}' is disabled or not registered in ${DB_PROFILE}.${SOURCE_REGISTRY_TABLE}`
+    );
+  }
+  throw new Error(MEMORY_SOURCE_VALIDATION_MESSAGE);
+}
+
+function buildSourceRegistryHealthPayload() {
+  if (SOURCE_MODE !== 'registry') {
+    return null;
+  }
+  return {
+    loaded: SOURCE_REGISTRY_CACHE.loaded,
+    loaded_at: SOURCE_REGISTRY_CACHE.loaded_at,
+    enabled_count: SOURCE_REGISTRY_CACHE.enabled_sources.length,
+    enabled_sources: SOURCE_REGISTRY_CACHE.enabled_sources.slice(),
+    effective_sources: MEMORY_SOURCE_LIST.slice(),
+    last_error: SOURCE_REGISTRY_CACHE.last_error || null
+  };
+}
+
+async function reloadSourceRegistryCache(options = {}) {
+  const manual = options.manual === true;
+  if (SOURCE_MODE !== 'registry') {
+    return {
+      ok: true,
+      mode: SOURCE_MODE,
+      reloaded: false,
+      manual,
+      message: 'MCP_SOURCE_MODE is not registry; source_registry cache is bypassed',
+      enabled_sources: [],
+      effective_sources: MEMORY_SOURCE_LIST.slice()
+    };
+  }
+
+  const query = new URLSearchParams();
+  query.set('select', SOURCE_REGISTRY_SELECT_COLUMNS);
+  query.set('enabled', 'eq.true');
+  query.set('order', 'source.asc');
+
+  try {
+    const rows = await supabaseRequest(
+      `/rest/v1/${SOURCE_REGISTRY_TABLE}?${query.toString()}`,
+      { profile: DB_PROFILE }
+    );
+    const enabledSources = [];
+    const seen = new Set();
+    for (const row of Array.isArray(rows) ? rows : []) {
+      const source = String(row?.source || '').trim();
+      if (!source || !SOURCE_NAME_PATTERN.test(source)) continue;
+      if (CORE_SOURCE_WHITELIST.has(source) || seen.has(source)) continue;
+      seen.add(source);
+      enabledSources.push(source);
+    }
+    SOURCE_REGISTRY_CACHE.loaded = true;
+    SOURCE_REGISTRY_CACHE.loaded_at = new Date().toISOString();
+    SOURCE_REGISTRY_CACHE.enabled_sources = enabledSources;
+    SOURCE_REGISTRY_CACHE.last_error = '';
+    setMemorySourceWhitelist(buildMemorySourceListForMode(enabledSources));
+    return {
+      ok: true,
+      mode: SOURCE_MODE,
+      reloaded: true,
+      manual,
+      loaded_at: SOURCE_REGISTRY_CACHE.loaded_at,
+      enabled_sources: enabledSources,
+      effective_sources: MEMORY_SOURCE_LIST.slice()
+    };
+  } catch (error) {
+    const errorMessage = String(error?.message || error);
+    SOURCE_REGISTRY_CACHE.loaded = false;
+    SOURCE_REGISTRY_CACHE.last_error = normalizeOptionalText(errorMessage, 280);
+    if (!SOURCE_REGISTRY_CACHE.loaded_at) {
+      SOURCE_REGISTRY_CACHE.enabled_sources = [];
+      setMemorySourceWhitelist(buildMemorySourceListForMode([]));
+    }
+    return {
+      ok: false,
+      mode: SOURCE_MODE,
+      reloaded: false,
+      manual,
+      loaded_at: SOURCE_REGISTRY_CACHE.loaded_at,
+      enabled_sources: SOURCE_REGISTRY_CACHE.enabled_sources.slice(),
+      effective_sources: MEMORY_SOURCE_LIST.slice(),
+      error: errorMessage
+    };
+  }
+}
+
 function normalizeTags(tags) {
   if (!Array.isArray(tags)) return [];
   return tags
@@ -801,6 +1151,15 @@ function parseTimestamp(value) {
   const parsed = new Date(value);
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
+function normalizeOptionalIsoTimestamp(value, fieldName = 'timestamp') {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  const parsed = parseTimestamp(raw);
+  if (!parsed) {
+    throw new Error(`${fieldName} must be a valid ISO timestamp`);
+  }
+  return parsed.toISOString();
+}
 
 function toUtcStartOfDay(date) {
   return new Date(
@@ -847,8 +1206,8 @@ function sortTagEntries(tagMap) {
 
 function normalizeDailySource(value) {
   const source = String(value || '').trim();
-  if (!SOURCE_WHITELIST.has(source)) {
-    throw new Error(SOURCE_VALIDATION_MESSAGE);
+  if (!CORE_SOURCE_WHITELIST.has(source)) {
+    throw new Error(CORE_SOURCE_VALIDATION_MESSAGE);
   }
   return source;
 }
@@ -858,6 +1217,233 @@ function normalizeOptionalText(value, maxLength = 200) {
   const text = String(value).trim();
   if (!text) return '';
   return text.slice(0, Math.max(1, maxLength));
+}
+function normalizeOptionalSourceTool(value) {
+  const normalized = String(value || '').trim();
+  if (!normalized) return '';
+  if (!CORE_SOURCE_WHITELIST.has(normalized)) {
+    throw new Error(CORE_SOURCE_VALIDATION_MESSAGE);
+  }
+  return normalized;
+}
+function normalizeOptionalAgentBody(value) {
+  const normalized = String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, '-');
+  if (!normalized) return '';
+  return normalized.slice(0, 80);
+}
+function normalizeOptionalEnvironment(value) {
+  const normalized = String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, '-');
+  if (!normalized) return '';
+  return normalized.slice(0, 80);
+}
+function normalizeMemoryScope(value) {
+  const normalized = String(value || 'this_body')
+    .trim()
+    .toLowerCase();
+  if (!MEMORY_SCOPE_VALUES.has(normalized)) {
+    throw new Error('scope must be one of this_body/all_bodies');
+  }
+  return normalized;
+}
+function inferAgentBodyFromSource(source) {
+  const normalizedSource = String(source || '')
+    .trim()
+    .toLowerCase();
+  if (!normalizedSource) return '';
+  return SOURCE_TO_AGENT_BODY_MAP.get(normalizedSource) || normalizedSource;
+}
+function inferAgentBodyFromOrigin(origin) {
+  const normalizedOrigin = String(origin || '')
+    .trim()
+    .toLowerCase();
+  if (!normalizedOrigin) return '';
+  const [originPrefix] = normalizedOrigin.split('-', 1);
+  return inferAgentBodyFromSource(originPrefix);
+}
+function resolveWriteAgentBody(args = {}) {
+  const explicit = normalizeOptionalAgentBody(args.agent_body);
+  if (explicit) return explicit;
+  const fromSourceTool = inferAgentBodyFromSource(args.source_tool);
+  if (fromSourceTool) return fromSourceTool;
+  const fromSource = inferAgentBodyFromSource(args.source);
+  if (fromSource) return fromSource;
+  const fromOrigin = inferAgentBodyFromOrigin(args.origin);
+  if (fromOrigin) return fromOrigin;
+  const fromDefault = normalizeOptionalAgentBody(DEFAULT_AGENT_BODY);
+  if (fromDefault) return fromDefault;
+  return DB_PROFILE;
+}
+function resolveWriteEnvironment(args = {}) {
+  const explicit = normalizeOptionalEnvironment(args.environment);
+  if (explicit) return explicit;
+  const fromDefault = normalizeOptionalEnvironment(DEFAULT_ENVIRONMENT);
+  if (fromDefault) return fromDefault;
+  return 'desktop';
+}
+function resolveScopeFilters(args = {}, fallbackAgentBody = '') {
+  const requestedScope = normalizeMemoryScope(args.scope);
+  const explicitAgentBody = normalizeOptionalAgentBody(args.agent_body);
+  const fallbackBody = normalizeOptionalAgentBody(fallbackAgentBody);
+  const defaultBody = normalizeOptionalAgentBody(DEFAULT_AGENT_BODY);
+  const agentBody = explicitAgentBody || fallbackBody || defaultBody || '';
+  const explicitEnvironment = normalizeOptionalEnvironment(args.environment);
+  const defaultEnvironment = normalizeOptionalEnvironment(DEFAULT_ENVIRONMENT);
+  const environment = explicitEnvironment || defaultEnvironment || '';
+  const effectiveScope =
+    requestedScope === 'this_body' && !agentBody ? 'all_bodies' : requestedScope;
+  return {
+    requested_scope: requestedScope,
+    scope: effectiveScope,
+    agent_body: agentBody || null,
+    environment: environment || null,
+    fallback_to_all_bodies: requestedScope === 'this_body' && effectiveScope === 'all_bodies'
+  };
+}
+function normalizeMemoryTagsWithContext(tags, agentBody, environment) {
+  return normalizeTags([
+    agentBody ? `agent_body:${agentBody}` : '',
+    environment ? `environment:${environment}` : '',
+    ...(Array.isArray(tags) ? tags : []),
+  ]);
+}
+function appendTokenCharCount(value, state) {
+  if (state.totalChars >= TOOL_USAGE_TOKEN_CHAR_CAP) return;
+  if (value === undefined || value === null) return;
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      appendTokenCharCount(item, state);
+      if (state.totalChars >= TOOL_USAGE_TOKEN_CHAR_CAP) break;
+    }
+    return;
+  }
+  let chunk = '';
+  if (typeof value === 'object') {
+    try {
+      chunk = JSON.stringify(value);
+    } catch {
+      chunk = '';
+    }
+  } else {
+    chunk = String(value);
+  }
+  if (!chunk) return;
+  state.totalChars = Math.min(
+    TOOL_USAGE_TOKEN_CHAR_CAP,
+    state.totalChars + chunk.length
+  );
+}
+function estimateToolUsageTokens(toolName, args = {}) {
+  const normalizedToolName = String(toolName || '')
+    .trim()
+    .toLowerCase();
+  const safeArgs = args && typeof args === 'object' ? args : {};
+  const state = { totalChars: 0 };
+  switch (normalizedToolName) {
+    case 'insert_memory':
+      appendTokenCharCount(safeArgs.body, state);
+      appendTokenCharCount(safeArgs.tags, state);
+      break;
+    case 'search_memories':
+    case 'recall':
+      appendTokenCharCount(safeArgs.query, state);
+      appendTokenCharCount(safeArgs.type, state);
+      break;
+    case 'session_close':
+      appendTokenCharCount(safeArgs.summary, state);
+      appendTokenCharCount(safeArgs.topics, state);
+      appendTokenCharCount(safeArgs.mood, state);
+      break;
+    case 'session_boot':
+      appendTokenCharCount(safeArgs.topic, state);
+      appendTokenCharCount(safeArgs.mood, state);
+      appendTokenCharCount(safeArgs.identity_query, state);
+      appendTokenCharCount(safeArgs.workflow_query, state);
+      appendTokenCharCount(safeArgs.status_query, state);
+      break;
+    case 'demote_memory':
+      appendTokenCharCount(safeArgs.deprecated_reason, state);
+      break;
+    case 'soft_forget':
+      appendTokenCharCount(safeArgs.reason, state);
+      break;
+    default:
+      if (TOOL_USAGE_INGEST_NAMES.has(normalizedToolName)) {
+        appendTokenCharCount(safeArgs.content, state);
+        appendTokenCharCount(safeArgs.section, state);
+        appendTokenCharCount(safeArgs.source_file, state);
+        appendTokenCharCount(safeArgs.source_user_note, state);
+      } else {
+        appendTokenCharCount(safeArgs, state);
+      }
+      break;
+  }
+  return Math.max(0, Math.round(state.totalChars / 4));
+}
+function resolveToolUsageAgentBody(toolName, args = {}) {
+  const safeArgs = args && typeof args === 'object' ? args : {};
+  const explicit = normalizeOptionalAgentBody(safeArgs.agent_body);
+  if (explicit) return explicit;
+  if (toolName === 'recall') {
+    const recallBody = normalizeOptionalAgentBody(safeArgs.body);
+    if (recallBody) return recallBody;
+  }
+  const fromSource = inferAgentBodyFromSource(safeArgs.source);
+  if (fromSource) return fromSource;
+  const fromOrigin = inferAgentBodyFromOrigin(safeArgs.origin);
+  if (fromOrigin) return fromOrigin;
+  const fromDefault = normalizeOptionalAgentBody(DEFAULT_AGENT_BODY);
+  if (fromDefault) return fromDefault;
+  return DB_PROFILE;
+}
+async function writeToolUsageTelemetry(payload = {}) {
+  const toolName = String(payload.tool_name || '')
+    .trim()
+    .toLowerCase();
+  if (!toolName) return;
+  const latencyMsRaw = Number(payload.latency_ms);
+  const latencyMs =
+    Number.isFinite(latencyMsRaw) && latencyMsRaw >= 0
+      ? Math.trunc(latencyMsRaw)
+      : 0;
+  const tokensEstimateRaw = Number(payload.tokens_estimate);
+  const tokensEstimate =
+    Number.isFinite(tokensEstimateRaw) && tokensEstimateRaw >= 0
+      ? Math.trunc(tokensEstimateRaw)
+      : 0;
+  const timestamp =
+    normalizeOptionalIsoTimestamp(payload.timestamp, 'timestamp') ||
+    new Date().toISOString();
+  const agentBody =
+    normalizeOptionalAgentBody(payload.agent_body) || DB_PROFILE;
+  try {
+    await supabaseRequest(
+      `/rest/v1/memory_tool_usage?select=${TOOL_USAGE_INSERT_SELECT_COLUMNS}`,
+      {
+        method: 'POST',
+        profile: DB_PROFILE,
+        prefer: 'return=minimal',
+        body: [
+          {
+            tool_name: toolName,
+            timestamp,
+            latency_ms: latencyMs,
+            tokens_estimate: tokensEstimate,
+            agent_body: agentBody
+          }
+        ]
+      }
+    );
+  } catch (error) {
+    console.warn(
+      `[telemetry] failed to persist memory_tool_usage: ${String(error?.message || error)}`
+    );
+  }
 }
 
 function normalizeDailyTopics(value) {
@@ -870,6 +1456,37 @@ function normalizeDailyTopics(value) {
 
 function dailyDateKey(date = new Date()) {
   return formatDateOnly(toUtcStartOfDay(date));
+}
+async function fetchToolUsageDailySummary(dateKey) {
+  const normalizedDate = normalizeChunkDate(dateKey);
+  try {
+    const result = await supabaseRequest('/rest/v1/rpc/memory_tool_usage_daily_summary', {
+      method: 'POST',
+      profile: DB_PROFILE,
+      body: {
+        p_date: normalizedDate
+      }
+    });
+    const row = Array.isArray(result) ? result[0] : null;
+    return {
+      status: 'ok',
+      date: normalizedDate,
+      recall_count: Math.max(0, Number(row?.recall_count) || 0),
+      insert_count: Math.max(0, Number(row?.insert_count) || 0),
+      ingest_count: Math.max(0, Number(row?.ingest_count) || 0),
+      total_count: Math.max(0, Number(row?.total_count) || 0)
+    };
+  } catch (error) {
+    return {
+      status: 'unavailable',
+      date: normalizedDate,
+      recall_count: 0,
+      insert_count: 0,
+      ingest_count: 0,
+      total_count: 0,
+      message: normalizeOptionalText(error?.message || String(error), 280)
+    };
+  }
 }
 
 function buildLifecycleSessionId(kind, source, dateKey) {
@@ -884,6 +1501,72 @@ function parseJsonObject(raw) {
   } catch {
     return null;
   }
+}
+
+function isSessionCloseSessionId(sessionId) {
+  const normalized = String(sessionId || '').trim().toLowerCase();
+  return (
+    normalized.startsWith('session_close:') ||
+    normalized.startsWith('daily_close:')
+  );
+}
+
+function extractSessionCloseSnapshot(memory) {
+  const sessionId = String(memory?.session_id || '').trim();
+  const payload = parseJsonObject(memory?.body) || {};
+  const payloadType = normalizeOptionalText(payload.type, 80).toLowerCase();
+  const isCloseType =
+    payloadType === 'session_close' ||
+    payloadType === 'session_close_auto_recovery' ||
+    payloadType === 'daily_close';
+  const isCloseRecord = isCloseType || isSessionCloseSessionId(sessionId);
+  if (!isCloseRecord) return null;
+
+  const summaryText =
+    normalizeOptionalText(payload.summary, 1000) ||
+    normalizeOptionalText(memory?.body, 240);
+
+  return {
+    id: memory?.id || null,
+    source: memory?.source || null,
+    session_id: sessionId || null,
+    date: normalizeOptionalText(payload.date, 20) || null,
+    summary: summaryText || null,
+    topics: normalizeDailyTopics(payload.topics),
+    mood: normalizeOptionalText(payload.mood, 80) || null,
+    created_at: memory?.created_at || null,
+    close_type: payloadType || 'session_close'
+  };
+}
+
+async function fetchLatestSessionCloseSnapshot(source) {
+  const loadRecentRows = async (sourceFilter, limit) => {
+    const query = new URLSearchParams();
+    query.set('select', MEMORY_SELECT_COLUMNS);
+    query.set('order', 'created_at.desc');
+    query.set('limit', String(limit));
+    if (sourceFilter) {
+      query.set('source', `eq.${sourceFilter}`);
+    }
+    const rows = await supabaseRequest(`/rest/v1/memories?${query.toString()}`, {
+      profile: DB_PROFILE
+    });
+    return Array.isArray(rows) ? rows : [];
+  };
+
+  const sourceScopedRows = await loadRecentRows(source, 80);
+  for (const row of sourceScopedRows) {
+    const snapshot = extractSessionCloseSnapshot(row);
+    if (snapshot) return snapshot;
+  }
+
+  const crossSourceRows = await loadRecentRows('', 120);
+  for (const row of crossSourceRows) {
+    const snapshot = extractSessionCloseSnapshot(row);
+    if (snapshot) return snapshot;
+  }
+
+  return null;
 }
 
 function buildDailyBootQueries(args = {}) {
@@ -928,6 +1611,156 @@ function summarizeRecallStep(result) {
   return {
     count,
     top_matches: topMatches
+  };
+}
+function tokenizeRecallText(text, options = {}) {
+  const raw = String(text || '').trim();
+  if (!raw) return [];
+  const maxTokens = clampInteger(options.max_tokens, 5, 80, 40);
+  const maxHanNgram = clampInteger(options.max_han_ngram, 2, 4, 3);
+  const tokenSet = new Set();
+
+  const latinTokens = raw.toLowerCase().match(/[a-z0-9][a-z0-9_-]{1,}/g) || [];
+  for (const token of latinTokens) {
+    tokenSet.add(token);
+    if (tokenSet.size >= maxTokens) {
+      return Array.from(tokenSet).slice(0, maxTokens);
+    }
+  }
+
+  const hanGroups = raw.match(/\p{Script=Han}+/gu) || [];
+  for (const group of hanGroups) {
+    const chars = Array.from(group);
+    if (chars.length < 2) continue;
+    const maxGramSize = Math.min(chars.length, maxHanNgram);
+    for (let gramSize = maxGramSize; gramSize >= 2; gramSize -= 1) {
+      for (let index = 0; index <= chars.length - gramSize; index += 1) {
+        tokenSet.add(chars.slice(index, index + gramSize).join(''));
+        if (tokenSet.size >= maxTokens) {
+          return Array.from(tokenSet).slice(0, maxTokens);
+        }
+      }
+    }
+  }
+
+  return Array.from(tokenSet).slice(0, maxTokens);
+}
+function findRecallTokenIndex(text, token) {
+  const content = String(text || '');
+  const keyword = String(token || '');
+  if (!content || !keyword) return -1;
+  if (/^[a-z0-9_-]+$/i.test(keyword)) {
+    return content.toLowerCase().indexOf(keyword.toLowerCase());
+  }
+  return content.indexOf(keyword);
+}
+function buildRecallMatchedSpans(content, overlapTokens, options = {}) {
+  const text = String(content || '');
+  if (!text) return [];
+  const maxSpans = clampInteger(options.max_spans, 1, 8, 3);
+  const contextRadius = clampInteger(options.context_radius, 10, 120, 24);
+  const spans = [];
+  const seen = new Set();
+
+  for (const token of Array.isArray(overlapTokens) ? overlapTokens : []) {
+    if (spans.length >= maxSpans) break;
+    const index = findRecallTokenIndex(text, token);
+    if (index < 0) continue;
+    const start = Math.max(0, index - contextRadius);
+    const end = Math.min(text.length, index + String(token).length + contextRadius);
+    const segment = text.slice(start, end).replace(/\s+/g, ' ').trim();
+    if (!segment) continue;
+    const span = `${start > 0 ? '…' : ''}${segment}${end < text.length ? '…' : ''}`;
+    const dedupeKey = `${token}::${span}`;
+    if (seen.has(dedupeKey)) continue;
+    seen.add(dedupeKey);
+    spans.push({
+      keyword: token,
+      span
+    });
+  }
+
+  return spans;
+}
+function buildRecallTimeHint(item, nowTs = new Date()) {
+  const dateText = normalizeOptionalText(item?.date, 20);
+  const referenceTs = parseTimestamp(
+    dateText ? `${dateText}T00:00:00.000Z` : item?.created_at
+  );
+  if (!referenceTs) return '';
+  const deltaDays = Math.abs(
+    diffDaysUtc(toUtcStartOfDay(referenceTs), toUtcStartOfDay(nowTs))
+  );
+  if (deltaDays <= 14) {
+    return `時間接近近期（約 ${deltaDays} 日內）`;
+  }
+  const normalizedDate = dateText || referenceTs.toISOString().slice(0, 10);
+  return `記錄時間 ${normalizedDate}`;
+}
+function buildRecallExplainSentence(item, overlapTokens, options = {}) {
+  const reasons = [];
+  if (overlapTokens.length === 1) {
+    reasons.push(`命中關鍵詞「${overlapTokens[0]}」`);
+  } else if (overlapTokens.length > 1) {
+    reasons.push(`同時命中關鍵詞「${overlapTokens.slice(0, 3).join('、')}」`);
+  }
+  const similarity = Number(item?.similarity);
+  if (Number.isFinite(similarity)) {
+    reasons.push(`語義相似度 ${(similarity * 100).toFixed(1)}%`);
+  }
+  const timeHint = buildRecallTimeHint(item, options.now || new Date());
+  if (timeHint) {
+    reasons.push(timeHint);
+  }
+  if (reasons.length === 0) {
+    return '主要由語義向量相近命中。';
+  }
+  return `因為${reasons.join('，')}。`;
+}
+function explainRecall(queryText, results = [], options = {}) {
+  const debugExplain = options.debug_explain === true;
+  const queryTokens = tokenizeRecallText(queryText, {
+    max_tokens: 40,
+    max_han_ngram: 3
+  });
+  const nowTs = parseTimestamp(options.now) || new Date();
+  const items = Array.isArray(results) ? results : [];
+  const explainedItems = items.map((item) => {
+    const hitTokens = tokenizeRecallText(item?.content || '', {
+      max_tokens: 60,
+      max_han_ngram: 3
+    });
+    const hitTokenSet = new Set(hitTokens);
+    const overlapTokens = queryTokens
+      .filter((token) => hitTokenSet.has(token))
+      .slice(0, 8);
+    const matchedSpans = buildRecallMatchedSpans(item?.content || '', overlapTokens, {
+      max_spans: 3,
+      context_radius: 24
+    });
+    const recallExplain = buildRecallExplainSentence(item, overlapTokens, {
+      now: nowTs
+    });
+    return {
+      ...item,
+      keywords_overlap: overlapTokens,
+      matched_spans: matchedSpans,
+      recall_explain: recallExplain,
+      ...(debugExplain
+        ? {
+            debug_explain: {
+              query_tokens: queryTokens,
+              hit_tokens: hitTokens,
+              overlap_tokens: overlapTokens
+            }
+          }
+        : {})
+    };
+  });
+
+  return {
+    query_tokens: queryTokens,
+    items: explainedItems
   };
 }
 
@@ -985,6 +1818,33 @@ async function fetchMemoryById(memoryId) {
   });
   return Array.isArray(rows) && rows.length > 0 ? rows[0] : null;
 }
+async function fetchLatestMemoryBySession(sessionId, source = '') {
+  const query = new URLSearchParams();
+  query.set('select', MEMORY_SELECT_COLUMNS);
+  query.set('session_id', `eq.${sessionId}`);
+  if (source) {
+    query.set('source', `eq.${source}`);
+  }
+  query.set('order', 'created_at.desc');
+  query.set('limit', '1');
+  const rows = await supabaseRequest(`/rest/v1/memories?${query.toString()}`, {
+    profile: DB_PROFILE
+  });
+  return Array.isArray(rows) && rows.length > 0 ? rows[0] : null;
+}
+async function fetchChunkById(chunkId) {
+  const query = new URLSearchParams();
+  query.set(
+    'select',
+    'id,content,source_file,section,body,visibility,tags,type,date,origin,source_memory_id,source_session_id,source_tool,source_user_note,agent_body,environment,created_at,updated_at'
+  );
+  query.set('id', `eq.${chunkId}`);
+  query.set('limit', '1');
+  const rows = await supabaseRequest(`/rest/v1/marsvault_chunks?${query.toString()}`, {
+    profile: DB_PROFILE
+  });
+  return Array.isArray(rows) && rows.length > 0 ? rows[0] : null;
+}
 async function markMemoryAsPromoted(memoryId) {
   const query = new URLSearchParams();
   query.set('id', `eq.${memoryId}`);
@@ -1008,13 +1868,21 @@ async function upsertMemoryBySession({
   body,
   tags,
   expires_at,
-  existing
+  existing,
+  agent_body,
+  environment
 }) {
+  const resolvedAgentBody =
+    normalizeOptionalAgentBody(agent_body) || resolveWriteAgentBody({ source });
+  const resolvedEnvironment =
+    normalizeOptionalEnvironment(environment) || resolveWriteEnvironment({ environment });
   const payload = {
     body,
     source,
     session_id,
-    tags: normalizeTags(tags)
+    tags: normalizeMemoryTagsWithContext(tags, resolvedAgentBody, resolvedEnvironment),
+    agent_body: resolvedAgentBody,
+    environment: resolvedEnvironment
   };
   if (expires_at) {
     payload.expires_at = expires_at;
@@ -1139,6 +2007,11 @@ async function runDailyBoot(args = {}) {
   const topic = normalizeOptionalText(args.topic, 200);
   const mood = normalizeOptionalText(args.mood, 80);
   const queries = buildDailyBootQueries(args);
+  const inferredSourceAgentBody = inferAgentBodyFromSource(source);
+  const recallScopeArgs = {
+    scope: 'this_body',
+    ...(inferredSourceAgentBody ? { agent_body: inferredSourceAgentBody } : {})
+  };
   const nowTs = new Date();
   const dateKey = dailyDateKey(nowTs);
   const heartbeatSessionId = buildLifecycleSessionId('session_boot', source, dateKey);
@@ -1152,16 +2025,38 @@ async function runDailyBoot(args = {}) {
 
   const soulRecall = await callTool('recall', {
     query: queries.identity_query,
-    limit: queries.recall_limit
+    limit: queries.recall_limit,
+    ...recallScopeArgs
   });
   const workflowRecall = await callTool('recall', {
     query: queries.workflow_query,
-    limit: queries.recall_limit
+    limit: queries.recall_limit,
+    ...recallScopeArgs
   });
   const statusRecall = await callTool('recall', {
     query: queries.status_query,
-    limit: queries.recall_limit
+    limit: queries.recall_limit,
+    ...recallScopeArgs
   });
+  const statusSummary = summarizeRecallStep(statusRecall);
+  let fallbackUsed = false;
+  let statusFallback = null;
+  let contextLayer = 'marsvault_recall';
+  if (statusSummary.count <= 0) {
+    statusFallback = await fetchLatestSessionCloseSnapshot(source);
+    if (statusFallback) {
+      fallbackUsed = true;
+      contextLayer = 'session_close_fallback';
+    } else {
+      contextLayer = 'empty_boot';
+    }
+  }
+  const contextMessage =
+    contextLayer === 'marsvault_recall'
+      ? 'session_boot 使用 MarsVault recall 作為當前上下文（Level 1/2）'
+      : contextLayer === 'session_close_fallback'
+        ? 'session_boot 未命中 MarsVault，已降級使用最近 session_close（Level 3）'
+        : 'session_boot 未命中 MarsVault，且無可用 session_close，使用空白啟動';
   const healthArgs = {};
   if (args.alert_window_hours !== undefined) {
     healthArgs.alert_window_hours = args.alert_window_hours;
@@ -1220,9 +2115,17 @@ async function runDailyBoot(args = {}) {
       workflow_query: queries.workflow_query,
       status_query: queries.status_query
     },
+    fallback_used: fallbackUsed,
+    context_layer: contextLayer,
+    context_message: contextMessage,
     soul: summarizeRecallStep(soulRecall),
     workflow: summarizeRecallStep(workflowRecall),
-    status: summarizeRecallStep(statusRecall),
+    status: {
+      ...statusSummary,
+      fallback_used: fallbackUsed,
+      context_layer: contextLayer,
+      fallback_session_close: statusFallback
+    },
     health: summarizeSessionBootHealthStep(health),
     auto_recovered_close: autoRecoveredClose
   };
@@ -1238,6 +2141,7 @@ async function runDailyClose(args = {}) {
   const mood = normalizeOptionalText(args.mood, 80);
   const nowTs = new Date();
   const dateKey = dailyDateKey(nowTs);
+  const toolUsageDailySummary = await fetchToolUsageDailySummary(dateKey);
   const closeSessionId = buildLifecycleSessionId('session_close', source, dateKey);
   let existingClose = await fetchMemoryBySessionId(closeSessionId, source);
   if (!existingClose) {
@@ -1254,6 +2158,7 @@ async function runDailyClose(args = {}) {
     summary,
     topics,
     mood: mood || null,
+    tool_usage_daily_summary: toolUsageDailySummary,
     updated_at: nowTs.toISOString()
   };
   const expiresAt = new Date(nowTs.getTime() + 7 * 24 * 3600000).toISOString();
@@ -1292,6 +2197,7 @@ async function runDailyClose(args = {}) {
     date: dateKey,
     topics,
     mood: mood || null,
+    tool_usage_daily_summary: toolUsageDailySummary,
     expiry_alert: {
       soon_expiring_count: soonExpiringCount,
       recommend_promote_count: recommendPromoteCount,
@@ -1391,6 +2297,81 @@ function evaluatePromotionCandidate(memory, nowTs, longTermTagSet) {
     reason: reasons.join('、') || '訊息不足，保守不升級'
   };
 }
+function isSessionBootSessionId(sessionId) {
+  const normalized = String(sessionId || '').trim().toLowerCase();
+  return (
+    normalized.startsWith('session_boot:') ||
+    normalized.startsWith('daily_boot:')
+  );
+}
+function normalizeSemanticTags(tags) {
+  return normalizeTags(tags)
+    .map((tag) => normalizeTopicTag(tag))
+    .filter(
+      (tag) =>
+        tag &&
+        !tag.startsWith('agent_body:') &&
+        !tag.startsWith('environment:')
+    );
+}
+function isLifecycleMemoryRow(memory) {
+  const sessionId = String(memory?.session_id || '').trim();
+  if (isSessionBootSessionId(sessionId) || isSessionCloseSessionId(sessionId)) {
+    return true;
+  }
+  const tagSet = new Set(normalizeSemanticTags(memory?.tags));
+  return (
+    tagSet.has('session_boot') ||
+    tagSet.has('session_close') ||
+    tagSet.has('heartbeat')
+  );
+}
+function buildForgetCandidates(memoryRows, nowTs, thresholdDays, limit) {
+  const nowDate = toUtcStartOfDay(nowTs);
+  const candidates = [];
+  for (const memory of memoryRows) {
+    if (Boolean(memory?.promoted) || Boolean(memory?.promoted_at)) continue;
+    if (isLifecycleMemoryRow(memory)) continue;
+    const createdAt = parseTimestamp(memory?.created_at);
+    if (!createdAt) continue;
+    const ageDays = Math.max(0, diffDaysUtc(toUtcStartOfDay(createdAt), nowDate));
+    if (ageDays < thresholdDays) continue;
+
+    const semanticTags = normalizeSemanticTags(memory?.tags);
+    const body = String(memory?.body || '').trim();
+    const expiresAt = parseTimestamp(memory?.expires_at);
+    const reasons = [];
+    if (semanticTags.length === 0) reasons.push('無主題 tags');
+    if (body.length < 120) reasons.push('內容較短');
+    if (expiresAt && expiresAt.getTime() - nowTs.getTime() > 7 * 24 * 3600000) {
+      reasons.push('距離自然到期仍遠');
+    }
+    if (reasons.length < 2) continue;
+
+    candidates.push({
+      id: memory?.id || null,
+      source: memory?.source || null,
+      session_id: memory?.session_id || null,
+      created_at: memory?.created_at || null,
+      expires_at: memory?.expires_at || null,
+      age_days: ageDays,
+      tags: normalizeTags(memory?.tags),
+      excerpt: body.slice(0, 140),
+      reason: reasons.join('、')
+    });
+  }
+  candidates.sort(
+    (left, right) =>
+      (right.age_days || 0) - (left.age_days || 0) ||
+      String(left.id || '').localeCompare(String(right.id || ''))
+  );
+  return {
+    stale_days_threshold: thresholdDays,
+    total_candidates: candidates.length,
+    limit,
+    candidates: candidates.slice(0, limit)
+  };
+}
 
 function buildHealthNarrative(payload) {
   const richTopic =
@@ -1412,6 +2393,10 @@ function buildHealthNarrative(payload) {
       : conflictStatus === 'unavailable'
         ? `衝突檢測暫不可用（${normalizeOptionalText(payload?.detect_conflicts?.message || 'unknown', 120)}）`
         : '衝突檢測未執行';
+  const forgetSummary =
+    Number(payload?.forget_candidates?.total_candidates || 0) > 0
+      ? `可考慮 soft_forget 的候選有 ${payload.forget_candidates.total_candidates} 條（已列出前 ${payload.forget_candidates.candidates.length} 條）`
+      : '目前未見需要優先 soft_forget 的候選';
 
   return `而家我有 ${payload.count_chunks.total_chunks} 個長記憶 chunk，最豐富主題係 ${richTopic}。` +
     `稀疏區域包括：${sparseTopics}。` +
@@ -1419,7 +2404,8 @@ function buildHealthNarrative(payload) {
     `${payload.expiry_alert.alert_window_hours} 小時內到期短記憶有 ${payload.expiry_alert.soon_expiring_count} 條，` +
     `其中建議升長記憶 ${payload.expiry_alert.recommended_for_promotion_count} 條。` +
     `${timelineGapText}。` +
-    `${conflictSummary}。`;
+    `${conflictSummary}。` +
+    `${forgetSummary}。`;
 }
 function buildExpiryNarrative({ alertWindowHours, soonExpiringCount, recommendedCount }) {
   return `${alertWindowHours} 小時內到期短記憶有 ${soonExpiringCount} 條，其中建議升長記憶 ${recommendedCount} 條。`;
@@ -1624,7 +2610,7 @@ async function runHealthExpiryCheck(args = {}) {
   const alertDeadlineTs = new Date(nowTs.getTime() + alertWindowHours * 3600000);
   const memoryLoad = await fetchPaginatedRows(
     'memories',
-    'id,body,tags,promoted,promoted_at,created_at,expires_at',
+    'id,body,source,session_id,tags,promoted,promoted_at,created_at,expires_at',
     {
       page_size: pageSize,
       max_rows: maxRows,
@@ -1716,6 +2702,8 @@ async function runHealthCheck(args = {}) {
     20,
     6
   );
+  const forgetCandidateDays = clampInteger(args.forget_candidate_days, 3, 180, 14);
+  const forgetCandidateLimit = clampInteger(args.forget_candidate_limit, 1, 50, 10);
 
   const nowTs = new Date();
   const nowDate = toUtcStartOfDay(nowTs);
@@ -1728,7 +2716,7 @@ async function runHealthCheck(args = {}) {
   });
   const memoryLoad = await fetchPaginatedRows(
     'memories',
-    'id,body,tags,promoted,promoted_at,created_at,expires_at',
+    'id,body,source,session_id,tags,promoted,promoted_at,created_at,expires_at',
     {
       page_size: pageSize,
       max_rows: maxRows,
@@ -1841,6 +2829,12 @@ async function runHealthCheck(args = {}) {
     scan_limit: conflictScanLimit,
     neighbor_limit: conflictNeighborLimit
   });
+  const forgetCandidates = buildForgetCandidates(
+    memoryRows,
+    nowTs,
+    forgetCandidateDays,
+    forgetCandidateLimit
+  );
 
   const payload = {
     ok: true,
@@ -1870,11 +2864,20 @@ async function runHealthCheck(args = {}) {
       blank_topics_estimate: volatileTopics.map((item) => item.topic)
     },
     detect_conflicts: conflictDetection,
+    forget_candidates: {
+      ...forgetCandidates,
+      action:
+        forgetCandidates.total_candidates > 0
+          ? 'suggest_only_use_soft_forget_to_apply'
+          : null
+    },
     diagnostics: {
       chunk_rows_truncated: chunkLoad.truncated,
       memory_rows_truncated: memoryLoad.truncated,
       page_size: pageSize,
-      max_rows: maxRows
+      max_rows: maxRows,
+      forget_candidate_days: forgetCandidateDays,
+      forget_candidate_limit: forgetCandidateLimit
     }
   };
   payload.narrative = buildHealthNarrative(payload);
@@ -2017,6 +3020,15 @@ async function ingestMarsvaultChunks(args = {}, options = {}) {
   const originRaw = String(args.origin || defaultOrigin).trim() || defaultOrigin;
   const origin = typeof normalizeOrigin === 'function' ? normalizeOrigin(originRaw) : originRaw;
   const sourceMemoryId = normalizeOptionalUuid(args.source_memory_id, 'source_memory_id') || null;
+  const sourceSessionId = normalizeOptionalText(args.source_session_id, 200) || null;
+  const sourceTool = normalizeOptionalSourceTool(args.source_tool) || null;
+  const sourceUserNote = normalizeOptionalText(args.source_user_note, 500) || null;
+  const agentBody = resolveWriteAgentBody({
+    ...args,
+    source_tool: sourceTool || args.source_tool,
+    origin
+  });
+  const environment = resolveWriteEnvironment(args);
   const chunkTexts = splitDigestContent(content, args.max_chunk_chars);
   if (chunkTexts.length === 0) {
     throw new Error('content produced no chunks');
@@ -2024,7 +3036,7 @@ async function ingestMarsvaultChunks(args = {}, options = {}) {
 
   const baseTags = normalizeTags(args.tags);
   const mergedTagSet = new Set([...fixedTags, ...baseTags]);
-  const tags = Array.from(mergedTagSet).slice(0, 30);
+  const tags = normalizeMemoryTagsWithContext(Array.from(mergedTagSet), agentBody, environment);
   const rows = [];
 
   for (let index = 0; index < chunkTexts.length; index += 1) {
@@ -2045,12 +3057,17 @@ async function ingestMarsvaultChunks(args = {}, options = {}) {
       date,
       content_hash: contentHash,
       origin,
-      source_memory_id: sourceMemoryId
+      source_memory_id: sourceMemoryId,
+      source_session_id: sourceSessionId,
+      source_tool: sourceTool,
+      source_user_note: sourceUserNote,
+      agent_body: agentBody,
+      environment
     });
   }
 
   const insertedRows = await supabaseRequest(
-    '/rest/v1/marsvault_chunks?on_conflict=source_file,section,content_hash,body&select=id,source_file,section,body,visibility,type,date,origin,source_memory_id,created_at,updated_at',
+    '/rest/v1/marsvault_chunks?on_conflict=source_file,section,content_hash,body&select=id,source_file,section,body,visibility,type,date,origin,source_memory_id,source_session_id,source_tool,source_user_note,agent_body,environment,created_at,updated_at',
     {
       method: 'POST',
       profile: DB_PROFILE,
@@ -2069,8 +3086,90 @@ async function ingestMarsvaultChunks(args = {}, options = {}) {
     visibility,
     origin,
     source_memory_id: sourceMemoryId,
+    source_session_id: sourceSessionId,
+    source_tool: sourceTool,
+    source_user_note: sourceUserNote,
+    agent_body: agentBody,
+    environment,
     date,
     items: Array.isArray(insertedRows) ? insertedRows : []
+  };
+}
+function buildPromoteTimeline(chunk, sourceMemory) {
+  const sourceCreatedAt = parseTimestamp(sourceMemory?.created_at);
+  const sourcePromotedAt = parseTimestamp(sourceMemory?.promoted_at);
+  const chunkCreatedAt = parseTimestamp(chunk?.created_at);
+  const sourceToChunkSeconds =
+    sourceCreatedAt && chunkCreatedAt
+      ? Math.max(0, Math.floor((chunkCreatedAt.getTime() - sourceCreatedAt.getTime()) / 1000))
+      : null;
+  const sourceToPromotedSeconds =
+    sourceCreatedAt && sourcePromotedAt
+      ? Math.max(0, Math.floor((sourcePromotedAt.getTime() - sourceCreatedAt.getTime()) / 1000))
+      : null;
+  return {
+    source_memory_created_at: sourceMemory?.created_at || null,
+    source_memory_promoted_at: sourceMemory?.promoted_at || null,
+    chunk_created_at: chunk?.created_at || null,
+    source_to_chunk_seconds: sourceToChunkSeconds,
+    source_to_promoted_seconds: sourceToPromotedSeconds
+  };
+}
+async function runExplainMemory(args = {}) {
+  const chunkId = normalizeOptionalUuid(args.id, 'id');
+  if (!chunkId) {
+    throw new Error('id is required');
+  }
+
+  const chunk = await fetchChunkById(chunkId);
+  if (!chunk) {
+    throw new Error(`memory chunk not found: ${chunkId}`);
+  }
+
+  const sourceMemoryId = normalizeOptionalUuid(chunk.source_memory_id, 'source_memory_id') || '';
+  const sourceSessionId = normalizeOptionalText(chunk.source_session_id, 200) || '';
+  const sourceTool = normalizeOptionalSourceTool(chunk.source_tool) || '';
+  const sourceUserNote = normalizeOptionalText(chunk.source_user_note, 500) || '';
+
+  let sourceMemory = null;
+  if (sourceMemoryId) {
+    sourceMemory = await fetchMemoryById(sourceMemoryId);
+  }
+  if (!sourceMemory && sourceSessionId) {
+    sourceMemory = await fetchLatestMemoryBySession(sourceSessionId, sourceTool);
+  }
+
+  return {
+    ok: true,
+    id: chunk.id,
+    chunk: {
+      id: chunk.id,
+      source_file: chunk.source_file || null,
+      section: chunk.section || null,
+      type: chunk.type || null,
+      date: chunk.date || null,
+      origin: chunk.origin || null,
+      excerpt: normalizeOptionalText(chunk.content, 220) || null,
+      created_at: chunk.created_at || null
+    },
+    source_short_memory: sourceMemory
+      ? {
+          id: sourceMemory.id || null,
+          source: sourceMemory.source || null,
+          session_id: sourceMemory.session_id || null,
+          excerpt: normalizeOptionalText(sourceMemory.body, 280) || null,
+          created_at: sourceMemory.created_at || null,
+          promoted: Boolean(sourceMemory.promoted),
+          promoted_at: sourceMemory.promoted_at || null
+        }
+      : null,
+    source_session_meta: {
+      source_memory_id: sourceMemoryId || sourceMemory?.id || null,
+      source_session_id: sourceSessionId || sourceMemory?.session_id || null,
+      source_tool: sourceTool || sourceMemory?.source || null,
+      source_user_note: sourceUserNote || null
+    },
+    promote_timeline: buildPromoteTimeline(chunk, sourceMemory)
   };
 }
 
@@ -2088,281 +3187,495 @@ function resolveToolName(name) {
 
 async function callTool(name, args = {}) {
   const toolName = resolveToolName(name);
-  if (toolName === 'insert_memory') {
-    const body = String(args.body || '').trim();
-    const source = String(args.source || '').trim();
-    const sessionId = String(args.session_id || '').trim();
-    const tags = normalizeTags(args.tags);
+  const telemetryStartedAtMs = Date.now();
+  const telemetryStartedAtIso = new Date(telemetryStartedAtMs).toISOString();
+  const telemetryTokensEstimate = estimateToolUsageTokens(toolName, args);
+  const telemetryAgentBody = resolveToolUsageAgentBody(toolName, args);
+  try {
+    if (toolName === 'insert_memory') {
+      const body = String(args.body || '').trim();
+      const source = String(args.source || '').trim();
+      const sessionId = String(args.session_id || '').trim();
+      const agentBody = resolveWriteAgentBody({ ...args, source });
+      const environment = resolveWriteEnvironment(args);
+      const tags = normalizeMemoryTagsWithContext(args.tags, agentBody, environment);
 
-    if (!body) {
-      throw new Error('body is required');
-    }
-    if (body.length > 12000) {
-      throw new Error('body too long (max 12000 chars)');
-    }
-    if (!SOURCE_WHITELIST.has(source)) {
-      throw new Error(SOURCE_VALIDATION_MESSAGE);
-    }
-    if (!sessionId) {
-      throw new Error('session_id is required');
+      if (!body) {
+        throw new Error('body is required');
+      }
+      if (body.length > 12000) {
+        throw new Error('body too long (max 12000 chars)');
+      }
+      validateMemorySource(source);
+      if (!sessionId) {
+        throw new Error('session_id is required');
+      }
+
+      const memoryId = crypto.randomUUID();
+      const payload = {
+        id: memoryId,
+        body,
+        source,
+        session_id: sessionId,
+        tags,
+        agent_body: agentBody,
+        environment
+      };
+      if (typeof args.expires_at === 'string' && args.expires_at.trim()) {
+        payload.expires_at = args.expires_at.trim();
+      }
+
+      const result = await supabaseRequest(
+        '/rest/v1/memories?select=id,source,session_id,tags,agent_body,environment,created_at,expires_at',
+        {
+          method: 'POST',
+          profile: DB_PROFILE,
+          prefer: 'return=representation',
+          body: [payload]
+        }
+      );
+      let inserted = result?.[0] ?? null;
+      if (!inserted) {
+        const fetched = await supabaseRequest(
+          `/rest/v1/memories?id=eq.${memoryId}&select=id,source,session_id,tags,agent_body,environment,created_at,expires_at`,
+          { profile: DB_PROFILE }
+        );
+        inserted = fetched?.[0] ?? null;
+      }
+      let embedding_status = 'skipped_no_api_key';
+      let embedding_error = null;
+      if (JINA_API_KEY) {
+        try {
+          const embedding = await createJinaEmbedding(body, 'retrieval.passage');
+          await setMemoryEmbedding(memoryId, embedding);
+          embedding_status = 'stored';
+        } catch (error) {
+          embedding_status = 'failed';
+          embedding_error = String(error?.message || error);
+        }
+      }
+
+      return {
+        ok: true,
+        inserted,
+        embedding_status,
+        ...(embedding_error ? { embedding_error } : {})
+      };
     }
 
-    const memoryId = crypto.randomUUID();
-    const payload = {
-      id: memoryId,
-      body,
-      source,
-      session_id: sessionId,
-      tags
-    };
-    if (typeof args.expires_at === 'string' && args.expires_at.trim()) {
-      payload.expires_at = args.expires_at.trim();
+    if (toolName === 'list_memories') {
+      const limitRaw = Number(args.limit ?? 20);
+      const limit = Number.isFinite(limitRaw)
+        ? Math.max(1, Math.min(100, Math.trunc(limitRaw)))
+        : 20;
+      const source = args.source ? String(args.source).trim() : '';
+      const unexpiredOnly = args.unexpired_only !== false;
+      if (source) {
+        validateMemorySource(source, { required: false });
+      }
+
+      const query = new URLSearchParams();
+      query.set(
+        'select',
+        'id,body,source,session_id,tags,agent_body,environment,promoted,promoted_at,created_at,expires_at'
+      );
+      query.set('order', 'created_at.desc');
+      query.set('limit', String(limit));
+      if (source) {
+        query.set('source', `eq.${source}`);
+      }
+      if (unexpiredOnly) {
+        query.set('expires_at', 'gt.now()');
+      }
+
+      const result = await supabaseRequest(`/rest/v1/memories?${query.toString()}`, {
+        profile: DB_PROFILE
+      });
+      return {
+        ok: true,
+        count: Array.isArray(result) ? result.length : 0,
+        items: Array.isArray(result) ? result : []
+      };
     }
 
-    const result = await supabaseRequest(
-      '/rest/v1/memories?select=id,source,session_id,tags,created_at,expires_at',
-      {
+    if (toolName === 'search_memories') {
+      const queryText = String(args.query || '').trim();
+      const limitRaw = Number(args.limit ?? 20);
+      const limit = Number.isFinite(limitRaw)
+        ? Math.max(1, Math.min(100, Math.trunc(limitRaw)))
+        : 20;
+      const source = args.source ? String(args.source).trim() : '';
+      const unexpiredOnly = args.unexpired_only !== false;
+      const minSimilarityRaw = args.min_similarity;
+      const minSimilarity =
+        minSimilarityRaw === undefined || minSimilarityRaw === null
+          ? null
+          : Number(minSimilarityRaw);
+
+      if (!queryText) {
+        throw new Error('query is required');
+      }
+      if (source) {
+        validateMemorySource(source, { required: false });
+      }
+      if (minSimilarity !== null && !Number.isFinite(minSimilarity)) {
+        throw new Error('min_similarity must be a finite number');
+      }
+      if (!JINA_API_KEY) {
+        throw new Error('JINA_API_KEY is not configured');
+      }
+      const scopeFilters = resolveScopeFilters(args, inferAgentBodyFromSource(source));
+
+      const queryEmbedding = await createJinaEmbedding(queryText, 'retrieval.query');
+      const queryEmbeddingText = embeddingVectorToText(queryEmbedding);
+      const result = await supabaseRequest('/rest/v1/rpc/search_memories_semantic', {
         method: 'POST',
         profile: DB_PROFILE,
-        prefer: 'return=representation',
-        body: [payload]
+        body: {
+          p_query_embedding_text: queryEmbeddingText,
+          p_match_count: limit,
+          p_source: source || null,
+          p_unexpired_only: unexpiredOnly,
+          p_scope: scopeFilters.scope,
+          p_agent_body: scopeFilters.agent_body,
+          p_environment: scopeFilters.environment
+        }
+      });
+
+      const items = Array.isArray(result) ? result : [];
+      const filteredItems =
+        minSimilarity === null
+          ? items
+          : items.filter((item) => Number(item?.similarity) >= minSimilarity);
+
+      return {
+        ok: true,
+        count: filteredItems.length,
+        scope: scopeFilters,
+        items: filteredItems
+      };
+    }
+    if (toolName === 'reload_source_registry') {
+      return reloadSourceRegistryCache({ manual: true });
+    }
+
+    if (toolName === 'recall') {
+      const queryText = String(args.query || '').trim();
+      const limitRaw = Number(args.limit ?? 5);
+      const limit = Number.isFinite(limitRaw)
+        ? Math.max(1, Math.min(50, Math.trunc(limitRaw)))
+        : 5;
+      const debugExplainRaw = args.debug_explain;
+      const debugExplain =
+        debugExplainRaw === undefined ? false : debugExplainRaw === true;
+      const body = args.body ? String(args.body).trim() : DB_PROFILE;
+      const includeGlobal = args.include_global !== false;
+      const includeShared = args.include_shared !== false;
+      const includePrivate = args.include_private !== false;
+      const type = args.type ? String(args.type).trim() : '';
+      const minSimilarityRaw = args.min_similarity;
+      const minSimilarity =
+        minSimilarityRaw === undefined || minSimilarityRaw === null
+          ? null
+          : Number(minSimilarityRaw);
+
+      if (!queryText) {
+        throw new Error('query is required');
       }
-    );
-    let inserted = result?.[0] ?? null;
-    if (!inserted) {
-      const fetched = await supabaseRequest(
-        `/rest/v1/memories?id=eq.${memoryId}&select=id,source,session_id,tags,created_at,expires_at`,
-        { profile: DB_PROFILE }
+      if (!PROFILE.recallBodyEnum.includes(body)) {
+        throw new Error(RECALL_BODY_VALIDATION_MESSAGE);
+      }
+      if (
+        debugExplainRaw !== undefined &&
+        typeof debugExplainRaw !== 'boolean'
+      ) {
+        throw new Error('debug_explain must be a boolean');
+      }
+      if (minSimilarity !== null && !Number.isFinite(minSimilarity)) {
+        throw new Error('min_similarity must be a finite number');
+      }
+      if (!JINA_API_KEY) {
+        throw new Error('JINA_API_KEY is not configured');
+      }
+      const scopeFilters = resolveScopeFilters(
+        args,
+        normalizeOptionalAgentBody(args.body)
       );
-      inserted = fetched?.[0] ?? null;
+
+      const queryEmbedding = await createJinaEmbedding(queryText, 'retrieval.query');
+      const queryEmbeddingText = embeddingVectorToText(queryEmbedding);
+      const result = await supabaseRequest('/rest/v1/rpc/search_marsvault_chunks_semantic', {
+        method: 'POST',
+        profile: DB_PROFILE,
+        body: {
+          p_query_embedding_text: queryEmbeddingText,
+          p_match_count: limit,
+          p_body: body,
+          p_include_global: includeGlobal,
+          p_include_shared: includeShared,
+          p_include_private: includePrivate,
+          p_type: type || null,
+          p_scope: scopeFilters.scope,
+          p_agent_body: scopeFilters.agent_body,
+          p_environment: scopeFilters.environment
+        }
+      });
+
+      const items = Array.isArray(result) ? result : [];
+      const filteredItems =
+        minSimilarity === null
+          ? items
+          : items.filter((item) => Number(item?.similarity) >= minSimilarity);
+      const explained = explainRecall(queryText, filteredItems, {
+        debug_explain: debugExplain
+      });
+
+      return {
+        ok: true,
+        count: explained.items.length,
+        scope: scopeFilters,
+        ...(debugExplain
+          ? {
+              debug_explain: {
+                query_tokens: explained.query_tokens
+              }
+            }
+          : {}),
+        items: explained.items
+      };
     }
-    let embedding_status = 'skipped_no_api_key';
-    let embedding_error = null;
-    if (JINA_API_KEY) {
-      try {
-        const embedding = await createJinaEmbedding(body, 'retrieval.passage');
-        await setMemoryEmbedding(memoryId, embedding);
-        embedding_status = 'stored';
-      } catch (error) {
-        embedding_status = 'failed';
-        embedding_error = String(error?.message || error);
+    if (toolName === 'explain_memory') {
+      return runExplainMemory(args);
+    }
+    if (toolName === 'demote_memory') {
+      const chunkId = normalizeOptionalUuid(args.id, 'id');
+      if (!chunkId) {
+        throw new Error('id is required');
       }
-    }
-
-    return {
-      ok: true,
-      inserted,
-      embedding_status,
-      ...(embedding_error ? { embedding_error } : {})
-    };
-  }
-
-  if (toolName === 'list_memories') {
-    const limitRaw = Number(args.limit ?? 20);
-    const limit = Number.isFinite(limitRaw)
-      ? Math.max(1, Math.min(100, Math.trunc(limitRaw)))
-      : 20;
-    const source = args.source ? String(args.source).trim() : '';
-    const unexpiredOnly = args.unexpired_only !== false;
-
-    if (source && !SOURCE_WHITELIST.has(source)) {
-      throw new Error(SOURCE_VALIDATION_MESSAGE);
-    }
-
-    const query = new URLSearchParams();
-    query.set(
-      'select',
-      'id,body,source,session_id,tags,promoted,promoted_at,created_at,expires_at'
-    );
-    query.set('order', 'created_at.desc');
-    query.set('limit', String(limit));
-    if (source) {
-      query.set('source', `eq.${source}`);
-    }
-    if (unexpiredOnly) {
-      query.set('expires_at', 'gt.now()');
-    }
-
-    const result = await supabaseRequest(`/rest/v1/memories?${query.toString()}`, {
-      profile: DB_PROFILE
-    });
-    return {
-      ok: true,
-      count: Array.isArray(result) ? result.length : 0,
-      items: Array.isArray(result) ? result : []
-    };
-  }
-
-  if (toolName === 'search_memories') {
-    const queryText = String(args.query || '').trim();
-    const limitRaw = Number(args.limit ?? 20);
-    const limit = Number.isFinite(limitRaw)
-      ? Math.max(1, Math.min(100, Math.trunc(limitRaw)))
-      : 20;
-    const source = args.source ? String(args.source).trim() : '';
-    const unexpiredOnly = args.unexpired_only !== false;
-    const minSimilarityRaw = args.min_similarity;
-    const minSimilarity =
-      minSimilarityRaw === undefined || minSimilarityRaw === null
-        ? null
-        : Number(minSimilarityRaw);
-
-    if (!queryText) {
-      throw new Error('query is required');
-    }
-    if (source && !SOURCE_WHITELIST.has(source)) {
-      throw new Error(SOURCE_VALIDATION_MESSAGE);
-    }
-    if (minSimilarity !== null && !Number.isFinite(minSimilarity)) {
-      throw new Error('min_similarity must be a finite number');
-    }
-    if (!JINA_API_KEY) {
-      throw new Error('JINA_API_KEY is not configured');
-    }
-
-    const queryEmbedding = await createJinaEmbedding(queryText, 'retrieval.query');
-    const queryEmbeddingText = embeddingVectorToText(queryEmbedding);
-    const result = await supabaseRequest('/rest/v1/rpc/search_memories_semantic', {
-      method: 'POST',
-      profile: DB_PROFILE,
-      body: {
-        p_query_embedding_text: queryEmbeddingText,
-        p_match_count: limit,
-        p_source: source || null,
-        p_unexpired_only: unexpiredOnly
+      const deprecatedReason = normalizeOptionalText(args.deprecated_reason, 500);
+      if (!deprecatedReason) {
+        throw new Error('deprecated_reason is required');
       }
-    });
-
-    const items = Array.isArray(result) ? result : [];
-    const filteredItems =
-      minSimilarity === null
-        ? items
-        : items.filter((item) => Number(item?.similarity) >= minSimilarity);
-
-    return {
-      ok: true,
-      count: filteredItems.length,
-      items: filteredItems
-    };
-  }
-
-  if (toolName === 'recall') {
-    const queryText = String(args.query || '').trim();
-    const limitRaw = Number(args.limit ?? 5);
-    const limit = Number.isFinite(limitRaw)
-      ? Math.max(1, Math.min(50, Math.trunc(limitRaw)))
-      : 5;
-    const body = args.body ? String(args.body).trim() : DB_PROFILE;
-    const includeGlobal = args.include_global !== false;
-    const includeShared = args.include_shared !== false;
-    const includePrivate = args.include_private !== false;
-    const type = args.type ? String(args.type).trim() : '';
-    const minSimilarityRaw = args.min_similarity;
-    const minSimilarity =
-      minSimilarityRaw === undefined || minSimilarityRaw === null
-        ? null
-        : Number(minSimilarityRaw);
-
-    if (!queryText) {
-      throw new Error('query is required');
-    }
-    if (!PROFILE.recallBodyEnum.includes(body)) {
-      throw new Error(RECALL_BODY_VALIDATION_MESSAGE);
-    }
-    if (minSimilarity !== null && !Number.isFinite(minSimilarity)) {
-      throw new Error('min_similarity must be a finite number');
-    }
-    if (!JINA_API_KEY) {
-      throw new Error('JINA_API_KEY is not configured');
-    }
-
-    const queryEmbedding = await createJinaEmbedding(queryText, 'retrieval.query');
-    const queryEmbeddingText = embeddingVectorToText(queryEmbedding);
-    const result = await supabaseRequest('/rest/v1/rpc/search_marsvault_chunks_semantic', {
-      method: 'POST',
-      profile: DB_PROFILE,
-      body: {
-        p_query_embedding_text: queryEmbeddingText,
-        p_match_count: limit,
-        p_body: body,
-        p_include_global: includeGlobal,
-        p_include_shared: includeShared,
-        p_include_private: includePrivate,
-        p_type: type || null
+      const supersededBy = normalizeOptionalUuid(args.superseded_by, 'superseded_by');
+      if (supersededBy && supersededBy === chunkId) {
+        throw new Error('superseded_by must be different from id');
       }
-    });
-
-    const items = Array.isArray(result) ? result : [];
-    const filteredItems =
-      minSimilarity === null
-        ? items
-        : items.filter((item) => Number(item?.similarity) >= minSimilarity);
-
-    return {
-      ok: true,
-      count: filteredItems.length,
-      items: filteredItems
-    };
-  }
-
-  if (toolName === 'health_check') {
-    return runHealthCheck(args);
-  }
-  if (toolName === 'session_boot') {
-    return runDailyBoot(args);
-  }
-  if (toolName === 'session_close') {
-    return runDailyClose(args);
-  }
-
-  if (toolName === 'dream_ingest') {
-    return ingestMarsvaultChunks(args, {
-      defaultType: 'digest',
-      defaultSourceFile: 'Hermes/Digest/auto.md',
-      defaultSectionPrefix: 'digest',
-      defaultOrigin: PROFILE.digestDefaultOrigin,
-      body: DB_PROFILE,
-      fixedTags: ['hermes', 'digest']
-    });
-  }
-  if (toolName === PROFILE.memoryIngestToolName) {
-    const sourceMemoryId = normalizeOptionalUuid(args.source_memory_id, 'source_memory_id');
-    if (sourceMemoryId) {
-      const linkedMemory = await fetchMemoryById(sourceMemoryId);
-      if (!linkedMemory) {
-        throw new Error(`source_memory_id not found: ${sourceMemoryId}`);
+      if (supersededBy) {
+        const replacementChunk = await fetchChunkById(supersededBy);
+        if (!replacementChunk) {
+          throw new Error(`superseded_by chunk not found: ${supersededBy}`);
+        }
       }
-    }
-    const ingestArgs = sourceMemoryId
-      ? { ...args, source_memory_id: sourceMemoryId }
-      : { ...args };
-    const ingestResult = await ingestMarsvaultChunks(ingestArgs, {
-      defaultType: 'insight',
-      defaultSourceFile: PROFILE.memoryIngestDefaultSourceFile,
-      defaultSectionPrefix: 'insight',
-      defaultOrigin: PROFILE.memoryIngestDefaultOrigin,
-      body: DB_PROFILE,
-      fixedTags: PROFILE.memoryIngestFixedTags,
-      normalizeOrigin: normalizeMemoryIngestOrigin
-    });
-    let promotedMemory = null;
-    if (sourceMemoryId) {
-      promotedMemory = await markMemoryAsPromoted(sourceMemoryId);
-    }
-    return {
-      ...ingestResult,
-      source_memory_id: sourceMemoryId || null,
-      promoted_memory: promotedMemory
-        ? {
-            id: promotedMemory.id || sourceMemoryId,
-            promoted: Boolean(promotedMemory.promoted),
-            promoted_at: promotedMemory.promoted_at || null
+      const deprecatedAt =
+        normalizeOptionalIsoTimestamp(args.deprecated_at, 'deprecated_at') ||
+        new Date().toISOString();
+      const patchQuery = new URLSearchParams();
+      patchQuery.set('id', `eq.${chunkId}`);
+      patchQuery.set(
+        'select',
+        'id,source_file,section,body,visibility,tags,type,date,origin,deprecated_at,deprecated_reason,superseded_by,updated_at'
+      );
+      const rows = await supabaseRequest(
+        `/rest/v1/marsvault_chunks?${patchQuery.toString()}`,
+        {
+          method: 'PATCH',
+          profile: DB_PROFILE,
+          prefer: 'return=representation',
+          body: {
+            deprecated_at: deprecatedAt,
+            deprecated_reason: deprecatedReason,
+            superseded_by: supersededBy || null
           }
-        : null
-    };
-  }
+        }
+      );
+      const demoted = Array.isArray(rows) ? rows[0] : null;
+      if (!demoted) {
+        throw new Error(`memory chunk not found: ${chunkId}`);
+      }
+      return {
+        ok: true,
+        demoted
+      };
+    }
+    if (toolName === 'soft_forget') {
+      const requestedIds = Array.isArray(args.ids) ? args.ids : [];
+      if (requestedIds.length === 0) {
+        throw new Error('ids is required');
+      }
+      const normalizedIds = [];
+      for (const rawId of requestedIds) {
+        const normalizedId = normalizeOptionalUuid(rawId, 'ids');
+        if (!normalizedId) continue;
+        normalizedIds.push(normalizedId);
+      }
+      const dedupedIds = Array.from(new Set(normalizedIds));
+      if (dedupedIds.length === 0) {
+        throw new Error('ids must contain at least one valid UUID');
+      }
+      const reason = normalizeOptionalText(args.reason, 500);
+      const forgottenAtIso =
+        normalizeOptionalIsoTimestamp(args.forgotten_at, 'forgotten_at') ||
+        new Date().toISOString();
+      const forgottenAtTs = parseTimestamp(forgottenAtIso) || new Date();
 
-  throw new Error(`Unknown tool: ${name}`);
+      const lookupQuery = new URLSearchParams();
+      lookupQuery.set(
+        'select',
+        'id,source,session_id,promoted,promoted_at,created_at,expires_at'
+      );
+      lookupQuery.set('id', `in.(${dedupedIds.join(',')})`);
+      const existingRows = await supabaseRequest(
+        `/rest/v1/memories?${lookupQuery.toString()}`,
+        {
+          profile: DB_PROFILE
+        }
+      );
+      const foundRows = Array.isArray(existingRows) ? existingRows : [];
+      const foundMap = new Map(foundRows.map((row) => [String(row?.id || ''), row]));
+      const notFoundIds = dedupedIds.filter((id) => !foundMap.has(id));
+      const toForgetIds = [];
+      const skippedItems = [];
+      for (const id of dedupedIds) {
+        const row = foundMap.get(id);
+        if (!row) continue;
+        const expiresAtTs = parseTimestamp(row.expires_at);
+        if (expiresAtTs && expiresAtTs.getTime() <= forgottenAtTs.getTime()) {
+          skippedItems.push({
+            id,
+            expires_at: row.expires_at || null,
+            reason: 'already_expired'
+          });
+          continue;
+        }
+        toForgetIds.push(id);
+      }
+
+      let forgottenRows = [];
+      if (toForgetIds.length > 0) {
+        const patchQuery = new URLSearchParams();
+        patchQuery.set('id', `in.(${toForgetIds.join(',')})`);
+        patchQuery.set(
+          'select',
+          'id,source,session_id,promoted,promoted_at,created_at,expires_at'
+        );
+        const patchedRows = await supabaseRequest(
+          `/rest/v1/memories?${patchQuery.toString()}`,
+          {
+            method: 'PATCH',
+            profile: DB_PROFILE,
+            prefer: 'return=representation',
+            body: {
+              expires_at: forgottenAtIso
+            }
+          }
+        );
+        forgottenRows = Array.isArray(patchedRows) ? patchedRows : [];
+      }
+
+      return {
+        ok: true,
+        forgotten_at: forgottenAtIso,
+        reason: reason || null,
+        requested_count: dedupedIds.length,
+        forgotten_count: forgottenRows.length,
+        skipped_count: skippedItems.length,
+        not_found_count: notFoundIds.length,
+        forgotten: forgottenRows,
+        skipped: skippedItems,
+        not_found_ids: notFoundIds
+      };
+    }
+
+    if (toolName === 'health_check') {
+      return runHealthCheck(args);
+    }
+    if (toolName === 'session_boot') {
+      return runDailyBoot(args);
+    }
+    if (toolName === 'session_close') {
+      return runDailyClose(args);
+    }
+
+    if (toolName === 'dream_ingest') {
+      return ingestMarsvaultChunks(args, {
+        defaultType: 'digest',
+        defaultSourceFile: 'Hermes/Digest/auto.md',
+        defaultSectionPrefix: 'digest',
+        defaultOrigin: PROFILE.digestDefaultOrigin,
+        body: DB_PROFILE,
+        fixedTags: ['hermes', 'digest']
+      });
+    }
+    if (toolName === PROFILE.memoryIngestToolName) {
+      const sourceMemoryId = normalizeOptionalUuid(args.source_memory_id, 'source_memory_id');
+      let linkedMemory = null;
+      if (sourceMemoryId) {
+        linkedMemory = await fetchMemoryById(sourceMemoryId);
+        if (!linkedMemory) {
+          throw new Error(`source_memory_id not found: ${sourceMemoryId}`);
+        }
+      }
+      const sourceSessionId =
+        normalizeOptionalText(args.source_session_id, 200) ||
+        normalizeOptionalText(linkedMemory?.session_id, 200);
+      const sourceTool =
+        normalizeOptionalSourceTool(args.source_tool) ||
+        normalizeOptionalSourceTool(linkedMemory?.source);
+      const sourceUserNote = normalizeOptionalText(args.source_user_note, 500);
+      const ingestAgentBody =
+        normalizeOptionalAgentBody(args.agent_body) ||
+        normalizeOptionalAgentBody(linkedMemory?.agent_body);
+      const ingestEnvironment =
+        normalizeOptionalEnvironment(args.environment) ||
+        normalizeOptionalEnvironment(linkedMemory?.environment);
+      const ingestArgs = {
+        ...args,
+        ...(sourceMemoryId ? { source_memory_id: sourceMemoryId } : {}),
+        ...(sourceSessionId ? { source_session_id: sourceSessionId } : {}),
+        ...(sourceTool ? { source_tool: sourceTool } : {}),
+        ...(sourceUserNote ? { source_user_note: sourceUserNote } : {}),
+        ...(ingestAgentBody ? { agent_body: ingestAgentBody } : {}),
+        ...(ingestEnvironment ? { environment: ingestEnvironment } : {})
+      };
+      const ingestResult = await ingestMarsvaultChunks(ingestArgs, {
+        defaultType: 'insight',
+        defaultSourceFile: PROFILE.memoryIngestDefaultSourceFile,
+        defaultSectionPrefix: 'insight',
+        defaultOrigin: PROFILE.memoryIngestDefaultOrigin,
+        body: DB_PROFILE,
+        fixedTags: PROFILE.memoryIngestFixedTags,
+        normalizeOrigin: normalizeMemoryIngestOrigin
+      });
+      let promotedMemory = null;
+      if (sourceMemoryId) {
+        promotedMemory = await markMemoryAsPromoted(sourceMemoryId);
+      }
+      return {
+        ...ingestResult,
+        source_memory_id: sourceMemoryId || null,
+        source_session_id: sourceSessionId || null,
+        source_tool: sourceTool || null,
+        source_user_note: sourceUserNote || null,
+        promoted_memory: promotedMemory
+          ? {
+              id: promotedMemory.id || sourceMemoryId,
+              promoted: Boolean(promotedMemory.promoted),
+              promoted_at: promotedMemory.promoted_at || null
+            }
+          : null
+      };
+    }
+
+    throw new Error(`Unknown tool: ${name}`);
+  } finally {
+    await writeToolUsageTelemetry({
+      tool_name: toolName,
+      timestamp: telemetryStartedAtIso,
+      latency_ms: Math.max(0, Date.now() - telemetryStartedAtMs),
+      tokens_estimate: telemetryTokensEstimate,
+      agent_body: telemetryAgentBody
+    });
+  }
 }
 
 function inferBaseUrl(req) {
@@ -2888,7 +4201,11 @@ const server = http.createServer(async (req, res) => {
       semantic_search_enabled: true,
       embedding_provider: 'jina',
       embedding_model: JINA_EMBEDDING_MODEL,
-      embedding_enabled: Boolean(JINA_API_KEY)
+      embedding_enabled: Boolean(JINA_API_KEY),
+      source_mode: SOURCE_MODE,
+      memory_sources: MEMORY_SOURCE_LIST.slice(),
+      extra_sources: EXTRA_SOURCE_LIST.slice(),
+      source_registry_cache: buildSourceRegistryHealthPayload()
     });
     return;
   }
@@ -3004,6 +4321,26 @@ const server = http.createServer(async (req, res) => {
 
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`${SERVER_NAME} listening on 0.0.0.0:${PORT}`);
+  console.log(`[config] source_mode=${SOURCE_MODE}`);
+  if (SOURCE_MODE === 'registry') {
+    void reloadSourceRegistryCache()
+      .then((result) => {
+        if (result?.ok) {
+          console.log(
+            `[source_registry] loaded ${result.enabled_sources.length} enabled sources`
+          );
+        } else {
+          console.warn(
+            `[source_registry] initial load failed: ${String(result?.error || 'unknown error')}`
+          );
+        }
+      })
+      .catch((error) => {
+        console.warn(
+          `[source_registry] initial load failed: ${String(error?.message || error)}`
+        );
+      });
+  }
   if (OAUTH_ENABLED) {
     console.log('oauth endpoints enabled: /.well-known/*, /oauth/register, /oauth/authorize, /oauth/token');
   }

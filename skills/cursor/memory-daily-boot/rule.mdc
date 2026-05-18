@@ -1,0 +1,23 @@
+---
+description: Memory-first daily boot template for Cursor
+alwaysApply: false
+---
+
+# Memory Daily Boot (Cursor Template)
+
+## When to trigger
+- User says "start", "boot", "pickup", or equivalent onboarding intent.
+
+## Required behavior
+1. Ask for today’s primary focus.
+2. Run `session_boot` with generic placeholders:
+   - source: `your-client`
+   - body_name: `your-agent-name`
+   - user_name: `your-name`
+3. Pull recent context using memory search/list tools.
+4. Continue implementation with concise progress updates.
+
+## Session close behavior
+1. Produce a concise summary of completed tasks.
+2. Run `session_close`.
+3. Save one follow-up memory for next-session continuity.
