@@ -43,7 +43,7 @@ jobs:
         env:
           TAG_NAME: ${{ github.ref_name }}
         run: |
-          VERSION="${TAG_NAME#v}"
+          export VERSION="${TAG_NAME#v}"
           node -e 'const fs=require("fs"); const p="server.json"; const v=process.env.VERSION; const j=JSON.parse(fs.readFileSync(p,"utf8")); j.version=v; if (Array.isArray(j.packages)) j.packages=j.packages.map(x=>({...x,version:v})); fs.writeFileSync(p, JSON.stringify(j,null,2)+"\n");'
 
       - name: Publish to MCP Registry
