@@ -29,6 +29,8 @@ Option A (recommended, Supabase CLI):
 ```bash
 npx supabase db push --db-url "<your-supabase-db-connection-string>"
 ```
+- Note: `--db-url` must be the Postgres database connection string from `Project Settings → Database → Connection string`.
+- It is not the same as `SUPABASE_BASE_URL` (`https://<project-ref>.supabase.co`, REST API URL).
 
 Option B (Supabase Dashboard SQL Editor):
 1. Open SQL Editor in Supabase Dashboard.
