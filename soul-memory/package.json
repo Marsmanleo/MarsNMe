@@ -1,6 +1,6 @@
 {
   "name": "@marsnme/mcp-gateway",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "mcpName": "io.github.Marsmanleo/marsnme",
   "private": false,
   "description": "Agent-agnostic, LLM-agnostic memory backend for MCP-compatible tools",
