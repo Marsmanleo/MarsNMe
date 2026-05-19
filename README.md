@@ -7,33 +7,68 @@ MarsNMe is built on a symbiosis philosophy: shared memory should strengthen trus
 An agent-agnostic, LLM-agnostic memory backend for MCP-compatible tools.
 
 # MarsNMe (repository: mars-memory-mcp)
-## Quick Start (5 minutes)
+## Before You Start (External Dependencies)
+1. Create a Supabase project (free plan is enough):
+   - Sign up: https://supabase.com
+   - Create project: https://supabase.com/dashboard/new
+   - Open API settings (Project Settings → API):
+     - Project URL → `SUPABASE_BASE_URL`
+     - `service_role` key → `SUPABASE_SERVICE_ROLE_KEY`
+   - Keep `SUPABASE_SERVICE_ROLE_KEY` private. Never commit it.
+2. Create a Jina API key (free tier available):
+   - Get key: https://jina.ai/api-key/
+   - Copy key to `JINA_API_KEY`
+
+## Quick Start (15-20 minutes)
 This is the fastest first-run path.  
 It follows the same tools-first flow as `docs/onboarding-a-mcp-zero-to-recall.md` and `docs/onboarding-b-platform-skill-install.md`.
-
-1. Clone and install:
+1. Clone repository:
 ```bash
 git clone https://github.com/Marsmanleo/MarsNMe.git
 cd MarsNMe
-npm --prefix soul-memory install
 ```
-2. Copy environment template:
+2. Verify Node.js version (20+ required):
+```bash
+node --version
+```
+3. Copy environment template:
 ```bash
 cp .env.example .env
 ```
-3. Fill required values in `.env`:
+4. Fill required values in `.env`:
    - `SUPABASE_BASE_URL`
    - `SUPABASE_SERVICE_ROLE_KEY`
    - `JINA_API_KEY`
-4. Start gateway:
+5. Run required Supabase migrations before first start:
+   - Option A (recommended, Supabase CLI):
+```bash
+npx supabase db push --db-url "<your-supabase-db-connection-string>"
+```
+   - Option B (Supabase Dashboard SQL Editor):
+     1. Open SQL Editor.
+     2. Ensure the `vector` extension is enabled first (Database → Extensions).
+     3. Run migration files in filename order from `supabase/migrations/`:
+        - `20260504052744_semantic_vector_dual_profile.sql`
+        - `20260513213800_memory_lifecycle_tracking.sql`
+        - `20260513222500_health_check_detect_conflicts_v2.sql`
+        - `20260517183000_provenance_audit_trail.sql`
+        - `20260517194000_memory_scope_agent_body_environment.sql`
+        - `20260517200500_forget_demote_mechanism.sql`
+        - `20260517223500_usage_cost_telemetry_light.sql`
+        - `20260517231000_memories_source_constraint_regex.sql`
+        - `20260517232000_source_registry_table.sql`
+6. Start gateway:
+   - `MCP_PROFILE` separates memory by agent or use case.
+   - Use any profile name you want (for example: `default`, `my-agent`, `profile-a`).
+   - Legacy built-in profile IDs `coco` and `toto` are still supported for compatibility.
 ```bash
 MCP_PROFILE=profile-a node soul-memory/server.mjs
 ```
-5. Verify health:
+7. Verify health:
 ```bash
 curl -sS http://127.0.0.1:18790/health
 ```
-6. Connect your MCP client (next section), then run the first round-trip check.
+8. Connect your MCP client (next section), then run the first round-trip check.
 
 ## MCP Client Connection Guide
 Local endpoint:
