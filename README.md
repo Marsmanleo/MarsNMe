@@ -254,6 +254,18 @@ bash soul-memory/deploy/phase2/deploy_ct101.sh --artifact <artifact> --manifest 
 ```bash
 bash soul-memory/deploy/phase3/smoke_gate.sh --spawn-local
 ```
+4. Automated npm + MCP Registry release (tag-driven):
+   - Workflow: `.github/workflows/publish-release.yml`
+   - Trigger: push tag `v*`
+   - Gate: tag version must match `soul-memory/package.json` version
+   - Optional local Fish helper:
+```bash
+mrel patch
+mrel minor
+mrel major
+mrel 0.1.2
+```
+   The helper updates `soul-memory/package.json` and `server.json`, commits, tags, and pushes.
 
 ## Security and version control
 - Never commit `.env`, runtime tokens, or `oauth-clients.json`
