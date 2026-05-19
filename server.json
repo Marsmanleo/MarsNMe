@@ -1,0 +1,55 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.marsmanleo/marsnme",
+  "title": "MarsNMe",
+  "description": "Agent-agnostic memory backend that preserves continuity between humans and AI over time.",
+  "websiteUrl": "https://github.com/Marsmanleo/MarsNMe",
+  "repository": {
+    "url": "https://github.com/Marsmanleo/MarsNMe",
+    "source": "github",
+    "subfolder": "soul-memory"
+  },
+  "version": "0.1.1",
+  "packages": [
+    {
+      "registryType": "npm",
+      "registryBaseUrl": "https://registry.npmjs.org",
+      "identifier": "@marsnme/mcp-gateway",
+      "version": "0.1.1",
+      "runtimeHint": "npx",
+      "transport": {
+        "type": "streamable-http",
+        "url": "http://127.0.0.1:18790/mcp"
+      },
+      "environmentVariables": [
+        {
+          "name": "MCP_PROFILE",
+          "description": "Profile ID used to separate memory data (for example: profile-a).",
+          "isRequired": true
+        },
+        {
+          "name": "SUPABASE_BASE_URL",
+          "description": "Supabase REST API project URL.",
+          "isRequired": true
+        },
+        {
+          "name": "SUPABASE_SERVICE_ROLE_KEY",
+          "description": "Supabase service role key.",
+          "isRequired": true,
+          "isSecret": true
+        },
+        {
+          "name": "JINA_API_KEY",
+          "description": "Jina AI API key for embedding-based tools.",
+          "isRequired": true,
+          "isSecret": true
+        },
+        {
+          "name": "PORT",
+          "description": "Local HTTP port for the MCP endpoint.",
+          "default": "18790"
+        }
+      ]
+    }
+  ]
+}

@@ -1,6 +1,7 @@
 {
   "name": "@marsnme/mcp-gateway",
   "version": "0.1.1",
+  "mcpName": "io.github.marsmanleo/marsnme",
   "private": false,
   "description": "Agent-agnostic, LLM-agnostic memory backend for MCP-compatible tools",
   "license": "Apache-2.0",
@@ -17,6 +18,19 @@
     "embedding",
     "supabase"
   ],
+  "bin": {
+    "marsnme": "server.mjs"
+  },
+  "files": [
+    "server.mjs",
+    "scripts/",
+    "deploy/phase2/",
+    "deploy/phase3/smoke_gate.sh",
+    "deploy/systemd/"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
   "type": "module",
   "scripts": {
     "start": "node server.mjs"
