@@ -1,6 +1,6 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
-  "name": "io.github.marsmanleo/marsnme",
+  "name": "io.github.Marsmanleo/marsnme",
   "title": "MarsNMe",
   "description": "Agent-agnostic memory backend that preserves continuity between humans and AI over time.",
   "websiteUrl": "https://github.com/Marsmanleo/MarsNMe",
