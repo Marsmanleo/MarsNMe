@@ -1,0 +1,46 @@
+name: Build Check
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-check:
+    name: Build Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Node dependencies (if any)
+        run: pnpm --dir soul-memory install --ignore-scripts --no-frozen-lockfile
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Node syntax check
+        run: node --check soul-memory/server.mjs
+
+      - name: Python unit tests
+        run: python3 soul-memory/scripts/tests/test_dream_runner_modes.py
+
+      - name: Shell script syntax check
+        run: bash -n soul-memory/deploy/phase3/smoke_gate.sh
