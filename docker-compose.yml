@@ -1,0 +1,69 @@
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
+    volumes:
+      - marsnme-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  migrate:
+    image: pgvector/pgvector:pg16
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_NAME: postgres
+      MIGRATIONS_DIR: /migrations
+    volumes:
+      - ./supabase/migrations:/migrations:ro
+      - ./docker/migrate.sh:/migrate.sh:ro
+    command: ["/bin/sh", "/migrate.sh"]
+    restart: "no"
+
+  rest:
+    image: postgrest/postgrest:v12.2.12
+    depends_on:
+      db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      PGRST_DB_URI: postgres://postgres:postgres@db:5432/postgres
+      PGRST_DB_SCHEMAS: public,extensions,coco,toto
+      PGRST_DB_ANON_ROLE: postgres
+      PGRST_SERVER_PORT: 3000
+      PGRST_OPENAPI_SERVER_PROXY_URI: http://127.0.0.1:8100
+    ports:
+      - "127.0.0.1:8100:3000"
+
+  marsnme:
+    image: node:20
+    working_dir: /workspace
+    depends_on:
+      rest:
+        condition: service_started
+    environment:
+      MCP_PROFILE: ${MCP_PROFILE:-coco}
+      PORT: 18790
+      SUPABASE_BASE_URL: http://rest:3000
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY:-local-dev-service-role}
+      MCP_REQUIRE_BEARER: "false"
+      JINA_API_KEY: ${JINA_API_KEY}
+    command: ["/bin/sh", "-lc", "npx -y @marsnme/mcp-gateway@0.1.4"]
+    ports:
+      - "127.0.0.1:18790:18790"
+
+volumes:
+  marsnme-pgdata:
