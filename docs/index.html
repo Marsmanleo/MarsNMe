@@ -57,6 +57,10 @@ nav{position:fixed;top:0;left:0;right:0;z-index:100;padding:var(--space-4) var(-
 /* HERO */
 .hero{min-height:100vh;display:flex;align-items:center;padding:var(--space-24) var(--space-8) var(--space-16);max-width:1100px;margin:0 auto;}
 .hero-inner{width:100%;}
+.hero-grid{display:grid;grid-template-columns:1fr 1fr;gap:var(--space-12);align-items:center;}
+.hero-left{}
+.hero-right{display:flex;justify-content:center;align-items:center;}
+.hero-demo-gif{width:100%;max-width:480px;border-radius:12px;border:1px solid var(--color-border);box-shadow:0 8px 48px rgba(249,115,22,0.12);}
 .hero-badge{display:inline-flex;align-items:center;gap:var(--space-2);font-family:var(--font-mono);font-size:var(--text-xs);color:var(--color-green);background:var(--color-green-dim);border:1px solid rgba(34,197,94,0.2);border-radius:var(--radius-sm);padding:4px 10px;margin-bottom:var(--space-6);letter-spacing:0.05em;}
 .hero-badge-dot{width:6px;height:6px;border-radius:50%;background:var(--color-green);animation:pulse-dot 1.5s infinite;}
 h1.hero-title{font-family:var(--font-mono);font-size:var(--text-hero);font-weight:700;line-height:1.05;letter-spacing:-0.03em;margin-bottom:var(--space-6);}
@@ -178,6 +182,9 @@ footer a:hover{color:var(--color-text);}
   nav{padding:var(--space-3) var(--space-4);}
   .nav-links{display:none;}
   .hero{padding:100px var(--space-4) var(--space-12);}
+  .hero-grid{grid-template-columns:1fr;}
+  .hero-right{margin-top:var(--space-8);}
+  .hero-demo-gif{max-width:100%;}
   .hero-stats{flex-wrap:wrap;gap:var(--space-6);}
   .how-grid,.install-grid{grid-template-columns:1fr;}
   .features-grid{grid-template-columns:1fr;}
@@ -215,30 +222,39 @@ footer a:hover{color:var(--color-text);}
 <!-- HERO -->
 <section class="hero">
   <div class="hero-inner">
-    <div class="hero-badge">
-      <span class="hero-badge-dot"></span>
-      MCP-Compatible · Open Source · Apache 2.0
-    </div>
-    <h1 class="hero-title">
-      Your AI and you,<br>
-      <span class="acc">always in sync.</span><br>
-      <span class="dim">Not just context.</span>
-    </h1>
-    <p class="hero-desc">
-      MarsNMe is an agent-agnostic memory backend that gives AI persistent memory — built on Supabase, powered by Jina embeddings, designed for humans and AI to grow together.
-    </p>
-    <div class="hero-actions">
-      <a href="#install" class="btn-primary">Install via Agent →</a>
-      <a href="https://github.com/Marsmanleo/MarsNMe" target="_blank" rel="noopener noreferrer" class="btn-ghost">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"/></svg>
-        View on GitHub
-      </a>
-    </div>
-    <div class="hero-stats">
-      <div class="stat"><span class="stat-num" id="stat-tools">13</span><span class="stat-label">MCP Tools</span></div>
-      <div class="stat"><span class="stat-num">∞</span><span class="stat-label">Profiles</span></div>
-      <div class="stat"><span class="stat-num">1024</span><span class="stat-label">Embedding Dims</span></div>
-      <div class="stat"><span class="stat-num">∞</span><span class="stat-label">Memory Horizon</span></div>
+    <div class="hero-grid">
+      <!-- LEFT: Text content -->
+      <div class="hero-left">
+        <div class="hero-badge">
+          <span class="hero-badge-dot"></span>
+          MCP-Compatible · Open Source · Apache 2.0
+        </div>
+        <h1 class="hero-title">
+          Your AI and you,<br>
+          <span class="acc">always in sync.</span><br>
+          <span class="dim">Not just context.</span>
+        </h1>
+        <p class="hero-desc">
+          MarsNMe is an agent-agnostic memory backend that gives AI persistent memory — built on Supabase, powered by Jina embeddings, designed for humans and AI to grow together.
+        </p>
+        <div class="hero-actions">
+          <a href="#install" class="btn-primary">Install via Agent →</a>
+          <a href="https://github.com/Marsmanleo/MarsNMe" target="_blank" rel="noopener noreferrer" class="btn-ghost">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"/></svg>
+            View on GitHub
+          </a>
+        </div>
+        <div class="hero-stats">
+          <div class="stat"><span class="stat-num" id="stat-tools">13</span><span class="stat-label">MCP Tools</span></div>
+          <div class="stat"><span class="stat-num">∞</span><span class="stat-label">Profiles</span></div>
+          <div class="stat"><span class="stat-num">1024</span><span class="stat-label">Embedding Dims</span></div>
+          <div class="stat"><span class="stat-num">∞</span><span class="stat-label">Memory Horizon</span></div>
+        </div>
+      </div>
+      <!-- RIGHT: Demo GIF -->
+      <div class="hero-right">
+        <img src="assets/demo.gif" alt="MarsNMe demo — AI memory recall in action" class="hero-demo-gif" loading="lazy">
+      </div>
     </div>
   </div>
 </section>
