@@ -44,9 +44,24 @@ services:
       PGRST_DB_SCHEMAS: public,extensions,coco,toto
       PGRST_DB_ANON_ROLE: postgres
       PGRST_SERVER_PORT: 3000
+      PGRST_JWT_SECRET: docker-local-dev-jwt-secret-at-least-32-characters!!
       PGRST_OPENAPI_SERVER_PROXY_URI: http://127.0.0.1:8100
+
+  rest-proxy:
+    image: node:20
+    depends_on:
+      rest:
+        condition: service_started
+    environment:
+      PROXY_TARGET_HOST: rest
+      PROXY_TARGET_PORT: 3000
+      MCP_PROFILE: ${MCP_PROFILE:-coco}
+      PROXY_PORT: 3001
+    volumes:
+      - ./docker/rest-proxy.mjs:/rest-proxy.mjs:ro
+    command: ["node", "/rest-proxy.mjs"]
     ports:
-      - "127.0.0.1:8100:3000"
+      - "127.0.0.1:8100:3001"
 
   marsnme:
     image: node:20
@@ -57,11 +72,11 @@ services:
     environment:
       MCP_PROFILE: ${MCP_PROFILE:-coco}
       PORT: 18790
-      SUPABASE_BASE_URL: http://rest:3000
-      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY:-local-dev-service-role}
+      SUPABASE_BASE_URL: http://rest-proxy:3001
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY:-eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoicG9zdGdyZXMiLCJpc3MiOiJtYXJzbm1lLWxvY2FsIiwiaWF0IjoxNzc5NDQwMDM1fQ.KC891-7yQ1lG70pVP-2r-vNO_bUuemlIzlrX0zgoC-0}
       MCP_REQUIRE_BEARER: "false"
       JINA_API_KEY: ${JINA_API_KEY}
-    command: ["/bin/sh", "-lc", "npx -y @marsnme/mcp-gateway@0.1.5"]
+    command: ["/bin/sh", "-lc", "npx -y @marsnme/mcp-gateway@latest"]
     ports:
       - "127.0.0.1:18790:18790"
 
@@ -75,11 +90,11 @@ services:
     environment:
       MCP_PROFILE: ${MCP_TUNNEL_PROFILE:-coco}
       PORT: 18790
-      SUPABASE_BASE_URL: http://rest:3000
-      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY:-local-dev-service-role}
+      SUPABASE_BASE_URL: http://rest-proxy:3001
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY:-eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoicG9zdGdyZXMiLCJpc3MiOiJtYXJzbm1lLWxvY2FsIiwiaWF0IjoxNzc5NDQwMDM1fQ.KC891-7yQ1lG70pVP-2r-vNO_bUuemlIzlrX0zgoC-0}
       MCP_REQUIRE_BEARER: ${MCP_TUNNEL_REQUIRE_BEARER:-false}
       JINA_API_KEY: ${JINA_API_KEY}
-    command: ["/bin/sh", "-lc", "npx -y @marsnme/mcp-gateway@0.1.5"]
+    command: ["/bin/sh", "-lc", "npx -y @marsnme/mcp-gateway@latest"]
 
   tunnel:
     image: cloudflare/cloudflared:latest
