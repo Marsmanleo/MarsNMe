@@ -45,6 +45,39 @@
   --text-2xl:clamp(1.6rem,1.2rem+2vw,2.4rem);
   --text-hero:clamp(2.2rem,1.2rem+4vw,4rem);
 }
+/* LIGHT THEME */
+[data-theme="light"]{
+  --color-bg:#f8f8f6;
+  --color-surface:#ffffff;
+  --color-surface-2:#f1f1ef;
+  --color-border:rgba(0,0,0,0.08);
+  --color-text:#18181b;
+  --color-text-muted:#52525b;
+  --color-text-faint:#a1a1aa;
+  --color-accent:#ea6c0a;
+  --color-accent-dim:rgba(234,108,10,0.12);
+  --color-accent-glow:rgba(234,108,10,0.06);
+  --color-green:#16a34a;
+  --color-green-dim:rgba(22,163,74,0.10);
+}
+
+/* THEME TOGGLE BUTTON */
+.theme-toggle{
+  background:none;border:1px solid var(--color-border);
+  border-radius:var(--radius-sm);padding:6px 10px;
+  cursor:pointer;font-size:16px;line-height:1;
+  color:var(--color-text-muted);
+  transition:all 150ms;
+  display:flex;align-items:center;
+}
+.theme-toggle:hover{border-color:var(--color-accent);color:var(--color-accent);}
+
+/* GIF filter in light mode */
+[data-theme="light"] .hero-demo-gif{
+  filter:brightness(0.92) contrast(1.05);
+  box-shadow:0 8px 48px rgba(234,108,10,0.15);
+}
+
 html{scroll-behavior:smooth;-webkit-font-smoothing:antialiased;}
 body{min-height:100dvh;font-family:var(--font-body);font-size:var(--text-base);color:var(--color-text);background:var(--color-bg);line-height:1.6;overflow-x:hidden;}
 body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.03) 2px,rgba(0,0,0,0.03) 4px);pointer-events:none;z-index:9999;}
@@ -222,6 +255,7 @@ footer a:hover{color:var(--color-text);}
     <a href="#tools">Tools</a>
     <a href="https://github.com/Marsmanleo/MarsNMe" target="_blank" rel="noopener noreferrer">GitHub</a>
   </div>
+  <button class="theme-toggle" id="theme-toggle" aria-label="Toggle theme" title="Toggle light/dark mode">🌙</button>
   <a href="#install" class="nav-btn">Get Started →</a>
 </nav>
 
@@ -770,6 +804,36 @@ const statsObserver = new IntersectionObserver((entries) => {
 },{threshold:0.5});
 const statEl = document.getElementById('stat-tools');
 if(statEl) statsObserver.observe(statEl.closest('.hero-stats'));
+</script>
+
+<script>
+(function(){
+  var STORAGE_KEY='marsnme-theme';
+  var btn=document.getElementById('theme-toggle');
+  var html=document.documentElement;
+
+  function setTheme(t){
+    html.setAttribute('data-theme',t);
+    btn.textContent=t==='light'?'🌙':'☀️';
+    btn.title=t==='light'?'Switch to dark mode':'Switch to light mode';
+    try{localStorage.setItem(STORAGE_KEY,t);}catch(e){}
+  }
+
+  // Init: check localStorage, then system preference
+  var saved;
+  try{saved=localStorage.getItem(STORAGE_KEY);}catch(e){}
+  if(saved==='light'||saved==='dark'){
+    setTheme(saved);
+  } else if(window.matchMedia&&window.matchMedia('(prefers-color-scheme: light)').matches){
+    setTheme('light');
+  } else {
+    setTheme('dark');
+  }
+
+  btn.addEventListener('click',function(){
+    setTheme(html.getAttribute('data-theme')==='dark'?'light':'dark');
+  });
+})();
 </script>
 </body>
 </html>
