@@ -1,4 +1,4 @@
-Turn your AI into a true companion — one that never forgets you, never abandons you, and grows with you over time.
+**[marsnme.com](https://marsnme.com)** — Turn your AI into a true companion that never forgets you, never abandons you, and grows with you over time.
 
 Most AI memory tools help AI remember you. MarsNMe helps you and your AI remember each other.
 
