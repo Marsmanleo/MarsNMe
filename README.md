@@ -15,6 +15,16 @@ An agent-agnostic, LLM-agnostic memory backend for MCP-compatible tools.
   <img src="docs/assets/demo-light.gif" alt="MarsNMe light mode demo" width="640" />
 </p>
 
+
+<p align="center">
+  <img src="docs/assets/social-concept.png" alt="MarsNMe — Your AI finally remembers you" width="720" />
+</p>
+<p align="center">
+  <img src="docs/assets/social-compare.png" alt="Without vs With MarsNMe" width="480" />
+  &nbsp;&nbsp;
+  <img src="docs/assets/social-arch.png" alt="How MarsNMe works" width="480" />
+</p>
+
 ## Available MCP Tools (13)
 
 | Tool | Description |
