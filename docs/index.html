@@ -1,0 +1,702 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MarsNMe — Persistent Memory for AI Agents</title>
+<meta name="description" content="Agent-agnostic, LLM-agnostic memory backend that preserves continuity between humans and AI over time.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,300..800;1,300..800&family=Inter:wght@300..700&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --font-mono:'JetBrains Mono',monospace;
+  --font-body:'Inter','Helvetica Neue',sans-serif;
+  --color-bg:#0a0a0b;
+  --color-surface:#111113;
+  --color-surface-2:#18181b;
+  --color-border:rgba(255,255,255,0.08);
+  --color-text:#e4e4e7;
+  --color-text-muted:#71717a;
+  --color-text-faint:#3f3f46;
+  --color-accent:#f97316;
+  --color-accent-dim:rgba(249,115,22,0.15);
+  --color-accent-glow:rgba(249,115,22,0.08);
+  --color-green:#22c55e;
+  --color-green-dim:rgba(34,197,94,0.12);
+  --color-blue:#3b82f6;
+  --color-red:#ef4444;
+  --radius-sm:4px;
+  --radius-md:6px;
+  --radius-lg:10px;
+  --space-1:4px;--space-2:8px;--space-3:12px;--space-4:16px;--space-6:24px;--space-8:32px;--space-10:40px;--space-12:48px;--space-16:64px;--space-20:80px;--space-24:96px;
+  --text-xs:clamp(0.7rem,0.65rem+0.25vw,0.8rem);
+  --text-sm:clamp(0.8rem,0.75rem+0.25vw,0.875rem);
+  --text-base:clamp(0.9rem,0.85rem+0.25vw,1rem);
+  --text-lg:clamp(1rem,0.9rem+0.5vw,1.2rem);
+  --text-xl:clamp(1.2rem,1rem+1vw,1.6rem);
+  --text-2xl:clamp(1.6rem,1.2rem+2vw,2.4rem);
+  --text-hero:clamp(2.2rem,1.2rem+4vw,4rem);
+}
+html{scroll-behavior:smooth;-webkit-font-smoothing:antialiased;}
+body{min-height:100dvh;font-family:var(--font-body);font-size:var(--text-base);color:var(--color-text);background:var(--color-bg);line-height:1.6;overflow-x:hidden;}
+body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.03) 2px,rgba(0,0,0,0.03) 4px);pointer-events:none;z-index:9999;}
+
+/* NAV */
+nav{position:fixed;top:0;left:0;right:0;z-index:100;padding:var(--space-4) var(--space-8);display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--color-border);background:rgba(10,10,11,0.85);backdrop-filter:blur(12px);}
+.nav-logo{font-family:var(--font-mono);font-size:var(--text-sm);font-weight:700;color:var(--color-text);letter-spacing:-0.02em;display:flex;align-items:center;gap:var(--space-2);text-decoration:none;}
+.nav-logo-dot{width:8px;height:8px;border-radius:50%;background:var(--color-accent);box-shadow:0 0 8px var(--color-accent);animation:pulse-dot 2s infinite;}
+@keyframes pulse-dot{0%,100%{opacity:1;transform:scale(1);}50%{opacity:0.6;transform:scale(0.85);}}
+.nav-links{display:flex;align-items:center;gap:var(--space-6);}
+.nav-links a{font-family:var(--font-mono);font-size:var(--text-xs);color:var(--color-text-muted);text-decoration:none;letter-spacing:0.05em;text-transform:uppercase;transition:color 150ms;}
+.nav-links a:hover{color:var(--color-text);}
+.nav-btn{font-family:var(--font-mono);font-size:var(--text-xs);padding:6px 14px;border:1px solid var(--color-accent);color:var(--color-accent);background:transparent;border-radius:var(--radius-sm);cursor:pointer;text-decoration:none;transition:all 150ms;letter-spacing:0.03em;}
+.nav-btn:hover{background:var(--color-accent);color:#000;}
+
+/* HERO */
+.hero{min-height:100vh;display:flex;align-items:center;padding:var(--space-24) var(--space-8) var(--space-16);max-width:1100px;margin:0 auto;}
+.hero-inner{width:100%;}
+.hero-badge{display:inline-flex;align-items:center;gap:var(--space-2);font-family:var(--font-mono);font-size:var(--text-xs);color:var(--color-green);background:var(--color-green-dim);border:1px solid rgba(34,197,94,0.2);border-radius:var(--radius-sm);padding:4px 10px;margin-bottom:var(--space-6);letter-spacing:0.05em;}
+.hero-badge-dot{width:6px;height:6px;border-radius:50%;background:var(--color-green);animation:pulse-dot 1.5s infinite;}
+h1.hero-title{font-family:var(--font-mono);font-size:var(--text-hero);font-weight:700;line-height:1.05;letter-spacing:-0.03em;margin-bottom:var(--space-6);}
+.hero-title span.acc{color:var(--color-accent);}
+.hero-title span.dim{color:var(--color-text-muted);}
+.hero-desc{font-size:var(--text-lg);color:var(--color-text-muted);max-width:600px;line-height:1.7;margin-bottom:var(--space-10);}
+.hero-actions{display:flex;align-items:center;gap:var(--space-4);flex-wrap:wrap;}
+.btn-primary{font-family:var(--font-mono);font-size:var(--text-sm);padding:12px 28px;background:var(--color-accent);color:#000;border:none;border-radius:var(--radius-sm);cursor:pointer;font-weight:700;letter-spacing:0.02em;transition:all 150ms;text-decoration:none;display:inline-block;}
+.btn-primary:hover{background:#fb923c;transform:translateY(-1px);box-shadow:0 8px 24px rgba(249,115,22,0.3);}
+.btn-ghost{font-family:var(--font-mono);font-size:var(--text-sm);padding:12px 28px;background:transparent;color:var(--color-text-muted);border:1px solid var(--color-border);border-radius:var(--radius-sm);cursor:pointer;letter-spacing:0.02em;transition:all 150ms;text-decoration:none;display:inline-flex;align-items:center;gap:var(--space-2);}
+.btn-ghost:hover{color:var(--color-text);border-color:rgba(255,255,255,0.2);}
+.hero-stats{display:flex;gap:var(--space-10);margin-top:var(--space-12);padding-top:var(--space-8);border-top:1px solid var(--color-border);}
+.stat{display:flex;flex-direction:column;gap:4px;}
+.stat-num{font-family:var(--font-mono);font-size:var(--text-xl);font-weight:700;color:var(--color-text);}
+.stat-label{font-size:var(--text-xs);color:var(--color-text-muted);letter-spacing:0.05em;text-transform:uppercase;}
+
+/* SECTION COMMON */
+section{padding:var(--space-20) var(--space-8);}
+.container{max-width:1100px;margin:0 auto;}
+.section-label{font-family:var(--font-mono);font-size:var(--text-xs);color:var(--color-accent);letter-spacing:0.12em;text-transform:uppercase;margin-bottom:var(--space-4);}
+.section-title{font-family:var(--font-mono);font-size:var(--text-2xl);font-weight:700;line-height:1.15;letter-spacing:-0.02em;margin-bottom:var(--space-4);}
+.section-desc{font-size:var(--text-base);color:var(--color-text-muted);max-width:560px;line-height:1.7;}
+
+/* HOW IT WORKS */
+.how-grid{display:grid;grid-template-columns:1fr 1fr;gap:var(--space-12);align-items:start;margin-top:var(--space-12);}
+.how-steps{display:flex;flex-direction:column;gap:var(--space-6);}
+.how-step{display:flex;gap:var(--space-4);align-items:flex-start;}
+.step-num{font-family:var(--font-mono);font-size:var(--text-xs);color:var(--color-accent);background:var(--color-accent-dim);border:1px solid rgba(249,115,22,0.2);border-radius:var(--radius-sm);padding:2px 8px;flex-shrink:0;margin-top:2px;letter-spacing:0.05em;}
+.step-content h3{font-family:var(--font-mono);font-size:var(--text-base);font-weight:600;margin-bottom:4px;}
+.step-content p{font-size:var(--text-sm);color:var(--color-text-muted);line-height:1.6;}
+
+/* TERMINAL CARD */
+.terminal{background:var(--color-surface);border:1px solid var(--color-border);border-radius:var(--radius-lg);overflow:hidden;box-shadow:0 24px 64px rgba(0,0,0,0.5);}
+.terminal-bar{display:flex;align-items:center;gap:var(--space-2);padding:var(--space-3) var(--space-4);background:var(--color-surface-2);border-bottom:1px solid var(--color-border);}
+.dot{width:10px;height:10px;border-radius:50%;}
+.dot-red{background:#ef4444;}
+.dot-yellow{background:#eab308;}
+.dot-green{background:#22c55e;}
+.terminal-title{font-family:var(--font-mono);font-size:var(--text-xs);color:var(--color-text-faint);margin-left:var(--space-2);}
+.terminal-body{padding:var(--space-6);font-family:var(--font-mono);font-size:var(--text-sm);line-height:1.8;}
+.t-prompt{color:var(--color-accent);}
+.t-cmd{color:var(--color-text);}
+.t-comment{color:var(--color-text-faint);}
+.t-output{color:var(--color-green);}
+.t-key{color:var(--color-blue);}
+.t-val{color:#e879f9;}
+.t-dim{color:var(--color-text-muted);}
+.t-line{display:block;margin-bottom:2px;}
+
+/* FEATURES */
+.features-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:var(--space-4);margin-top:var(--space-12);}
+.feature-card{background:var(--color-surface);border:1px solid var(--color-border);border-radius:var(--radius-lg);padding:var(--space-6);transition:all 200ms;}
+.feature-card:hover{border-color:rgba(249,115,22,0.25);background:var(--color-surface-2);transform:translateY(-2px);}
+.feature-icon{width:36px;height:36px;background:var(--color-accent-dim);border-radius:var(--radius-sm);display:flex;align-items:center;justify-content:center;margin-bottom:var(--space-4);}
+.feature-icon svg{width:18px;height:18px;stroke:var(--color-accent);fill:none;stroke-width:1.8;}
+.feature-title{font-family:var(--font-mono);font-size:var(--text-base);font-weight:600;margin-bottom:var(--space-2);}
+.feature-desc{font-size:var(--text-sm);color:var(--color-text-muted);line-height:1.6;}
+.feature-tag{display:inline-block;font-family:var(--font-mono);font-size:10px;color:var(--color-text-faint);background:var(--color-surface-2);border:1px solid var(--color-border);border-radius:var(--radius-sm);padding:2px 6px;margin-top:var(--space-4);letter-spacing:0.04em;}
+
+/* INSTALL AGENT SECTION */
+.install-section{background:var(--color-surface);border-top:1px solid var(--color-border);border-bottom:1px solid var(--color-border);}
+.install-grid{display:grid;grid-template-columns:1fr 1fr;gap:var(--space-12);align-items:start;}
+.install-header{margin-bottom:var(--space-8);}
+.agent-badge{display:inline-flex;align-items:center;gap:var(--space-2);font-family:var(--font-mono);font-size:var(--text-xs);color:#a78bfa;background:rgba(167,139,250,0.1);border:1px solid rgba(167,139,250,0.2);border-radius:var(--radius-sm);padding:3px 10px;margin-bottom:var(--space-4);letter-spacing:0.05em;}
+.agent-steps{display:flex;flex-direction:column;gap:var(--space-6);}
+.agent-step{display:flex;gap:var(--space-4);}
+.agent-step-icon{width:32px;height:32px;border-radius:var(--radius-sm);background:rgba(167,139,250,0.1);border:1px solid rgba(167,139,250,0.2);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.agent-step-icon svg{width:16px;height:16px;stroke:#a78bfa;fill:none;stroke-width:1.8;}
+.agent-step-body h4{font-family:var(--font-mono);font-size:var(--text-sm);font-weight:600;margin-bottom:4px;}
+.agent-step-body p{font-size:var(--text-sm);color:var(--color-text-muted);line-height:1.6;}
+
+/* INTERACTIVE INSTALL TERMINAL */
+.install-terminal{background:var(--color-bg);border:1px solid var(--color-border);border-radius:var(--radius-lg);overflow:hidden;box-shadow:0 24px 64px rgba(0,0,0,0.6);}
+.install-terminal .terminal-bar{background:var(--color-surface);}
+.install-terminal-body{padding:var(--space-6);}
+.profile-tabs{display:flex;gap:var(--space-2);margin-bottom:var(--space-6);flex-wrap:wrap;}
+.profile-tab{font-family:var(--font-mono);font-size:var(--text-xs);padding:5px 12px;border-radius:var(--radius-sm);border:1px solid var(--color-border);color:var(--color-text-muted);cursor:pointer;transition:all 150ms;background:transparent;letter-spacing:0.04em;}
+.profile-tab.active{border-color:rgba(249,115,22,0.4);color:var(--color-accent);background:var(--color-accent-dim);}
+.cmd-block{background:var(--color-surface-2);border:1px solid var(--color-border);border-radius:var(--radius-md);padding:var(--space-4);margin-bottom:var(--space-4);position:relative;}
+.cmd-block pre{font-family:var(--font-mono);font-size:var(--text-xs);line-height:1.7;overflow-x:auto;white-space:pre;}
+.copy-btn{position:absolute;top:var(--space-3);right:var(--space-3);font-family:var(--font-mono);font-size:10px;padding:3px 8px;background:var(--color-surface);border:1px solid var(--color-border);border-radius:var(--radius-sm);color:var(--color-text-muted);cursor:pointer;transition:all 150ms;letter-spacing:0.04em;}
+.copy-btn:hover{color:var(--color-text);border-color:rgba(255,255,255,0.2);}
+.copy-btn.copied{color:var(--color-green);border-color:rgba(34,197,94,0.3);}
+.install-note{font-family:var(--font-mono);font-size:var(--text-xs);color:var(--color-text-faint);border-top:1px solid var(--color-border);padding-top:var(--space-4);margin-top:var(--space-4);line-height:1.7;}
+
+/* TOOLS TABLE */
+.tools-grid{display:grid;grid-template-columns:1fr 1fr;gap:var(--space-4);margin-top:var(--space-10);}
+.tool-row{background:var(--color-surface);border:1px solid var(--color-border);border-radius:var(--radius-md);padding:var(--space-4) var(--space-6);display:flex;align-items:flex-start;gap:var(--space-4);transition:border-color 200ms;}
+.tool-row:hover{border-color:rgba(249,115,22,0.2);}
+.tool-name{font-family:var(--font-mono);font-size:var(--text-xs);color:var(--color-green);background:var(--color-green-dim);border:1px solid rgba(34,197,94,0.15);border-radius:var(--radius-sm);padding:2px 8px;flex-shrink:0;letter-spacing:0.03em;white-space:nowrap;margin-top:2px;}
+.tool-info h4{font-family:var(--font-mono);font-size:var(--text-sm);font-weight:600;margin-bottom:2px;}
+.tool-info p{font-size:var(--text-xs);color:var(--color-text-muted);line-height:1.5;}
+.memory-badge{display:inline-block;font-size:9px;font-family:var(--font-mono);padding:1px 5px;border-radius:2px;margin-left:4px;letter-spacing:0.04em;}
+.badge-short{background:rgba(59,130,246,0.15);color:var(--color-blue);border:1px solid rgba(59,130,246,0.2);}
+.badge-long{background:rgba(249,115,22,0.1);color:var(--color-accent);border:1px solid rgba(249,115,22,0.2);}
+.badge-ops{background:rgba(34,197,94,0.1);color:var(--color-green);border:1px solid rgba(34,197,94,0.2);}
+
+/* ENV VARS */
+.env-grid{display:grid;grid-template-columns:1fr 1fr;gap:var(--space-4);margin-top:var(--space-8);}
+.env-item{display:flex;flex-direction:column;gap:4px;}
+.env-key{font-family:var(--font-mono);font-size:var(--text-xs);color:var(--color-blue);letter-spacing:0.03em;}
+.env-desc{font-size:var(--text-xs);color:var(--color-text-muted);line-height:1.5;}
+.env-required{font-size:9px;font-family:var(--font-mono);color:var(--color-red);background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.2);border-radius:2px;padding:1px 5px;margin-left:4px;vertical-align:middle;}
+.env-optional{font-size:9px;font-family:var(--font-mono);color:var(--color-text-faint);background:rgba(255,255,255,0.03);border:1px solid var(--color-border);border-radius:2px;padding:1px 5px;margin-left:4px;vertical-align:middle;}
+
+/* CTA */
+.cta-section{text-align:center;padding:var(--space-24) var(--space-8);}
+.cta-section .section-title{font-size:var(--text-2xl);margin-bottom:var(--space-6);}
+.cta-section .section-desc{margin:0 auto var(--space-10);}
+.cta-actions{display:flex;gap:var(--space-4);justify-content:center;flex-wrap:wrap;}
+
+/* FOOTER */
+footer{border-top:1px solid var(--color-border);padding:var(--space-8);text-align:center;font-family:var(--font-mono);font-size:var(--text-xs);color:var(--color-text-faint);}
+footer a{color:var(--color-text-muted);text-decoration:none;}
+footer a:hover{color:var(--color-text);}
+
+/* RESPONSIVE */
+@media(max-width:768px){
+  nav{padding:var(--space-3) var(--space-4);}
+  .nav-links{display:none;}
+  .hero{padding:100px var(--space-4) var(--space-12);}
+  .hero-stats{flex-wrap:wrap;gap:var(--space-6);}
+  .how-grid,.install-grid{grid-template-columns:1fr;}
+  .features-grid{grid-template-columns:1fr;}
+  .tools-grid,.env-grid{grid-template-columns:1fr;}
+  section{padding:var(--space-12) var(--space-4);}
+  .cta-section{padding:var(--space-16) var(--space-4);}
+}
+
+/* REVEAL ANIMATIONS */
+.reveal{opacity:0;transform:translateY(20px);transition:opacity 0.5s ease,transform 0.5s ease;}
+.reveal.visible{opacity:1;transform:translateY(0);}
+
+/* CURSOR BLINK */
+.cursor{display:inline-block;width:10px;height:1.1em;background:var(--color-accent);vertical-align:text-bottom;animation:blink 1.1s step-start infinite;margin-left:2px;}
+@keyframes blink{0%,100%{opacity:1;}50%{opacity:0;}}
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <a href="#" class="nav-logo">
+    <span class="nav-logo-dot"></span>
+    MarsNMe
+  </a>
+  <div class="nav-links">
+    <a href="#how">How It Works</a>
+    <a href="#install">Install</a>
+    <a href="#tools">Tools</a>
+    <a href="https://github.com/Marsmanleo/MarsNMe" target="_blank" rel="noopener noreferrer">GitHub</a>
+  </div>
+  <a href="#install" class="nav-btn">Get Started →</a>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-inner">
+    <div class="hero-badge">
+      <span class="hero-badge-dot"></span>
+      MCP-Compatible · Open Source · Apache 2.0
+    </div>
+    <h1 class="hero-title">
+      Your AI and you,<br>
+      <span class="acc">always in sync.</span><br>
+      <span class="dim">Not just context.</span>
+    </h1>
+    <p class="hero-desc">
+      MarsNMe is an agent-agnostic memory backend that gives AI persistent memory — built on Supabase, powered by Jina embeddings, designed for humans and AI to grow together.
+    </p>
+    <div class="hero-actions">
+      <a href="#install" class="btn-primary">Install via Agent →</a>
+      <a href="https://github.com/Marsmanleo/MarsNMe" target="_blank" rel="noopener noreferrer" class="btn-ghost">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"/></svg>
+        View on GitHub
+      </a>
+    </div>
+    <div class="hero-stats">
+      <div class="stat"><span class="stat-num" id="stat-tools">9</span><span class="stat-label">MCP Tools</span></div>
+      <div class="stat"><span class="stat-num">∞</span><span class="stat-label">Profiles</span></div>
+      <div class="stat"><span class="stat-num">1024</span><span class="stat-label">Embedding Dims</span></div>
+      <div class="stat"><span class="stat-num">∞</span><span class="stat-label">Memory Horizon</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- HOW IT WORKS -->
+<section id="how">
+  <div class="container">
+    <div class="section-label reveal">Architecture</div>
+    <h2 class="section-title reveal">Two layers of memory,<br>one coherent mind.</h2>
+    <div class="how-grid">
+      <div class="how-steps reveal">
+        <div class="how-step">
+          <span class="step-num">01</span>
+          <div class="step-content">
+            <h3>Short-term Memory</h3>
+            <p>Session context and recent interactions stored in <code style="font-family:var(--font-mono);color:var(--color-green);font-size:0.9em;">&lt;profile&gt;.memories</code>. Fast reads, ~30 day TTL.</p>
+          </div>
+        </div>
+        <div class="how-step">
+          <span class="step-num">02</span>
+          <div class="step-content">
+            <h3>Long-term Knowledge</h3>
+            <p>Semantic chunks ingested into <code style="font-family:var(--font-mono);color:var(--color-green);font-size:0.9em;">marsvault_chunks</code> with Jina v3 embeddings. Semantic recall via pgvector.</p>
+          </div>
+        </div>
+        <div class="how-step">
+          <span class="step-num">03</span>
+          <div class="step-content">
+            <h3>Multi-Profile Architecture</h3>
+            <p>One codebase, any number of agents. Set <code style="font-family:var(--font-mono);color:var(--color-accent);font-size:0.9em;">MCP_PROFILE=my-agent</code> to route all reads and writes to isolated schemas.</p>
+          </div>
+        </div>
+        <div class="how-step">
+          <span class="step-num">04</span>
+          <div class="step-content">
+            <h3>Schema-as-Code</h3>
+            <p>All migrations live in <code style="font-family:var(--font-mono);color:var(--color-text-muted);font-size:0.9em;">supabase/migrations/</code>. Reproducible deployments, version-controlled memory schema.</p>
+          </div>
+        </div>
+      </div>
+      <div class="terminal reveal">
+        <div class="terminal-bar">
+          <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+          <span class="terminal-title">MarsNMe — multi profile</span>
+        </div>
+        <div class="terminal-body">
+          <span class="t-line"><span class="t-comment"># Start your agent profile</span></span>
+          <span class="t-line"><span class="t-prompt">$ </span><span class="t-key">MCP_PROFILE</span>=<span class="t-val">my-agent</span> <span class="t-cmd">npx @marsnme/mcp-gateway</span></span>
+          <span class="t-line"><span class="t-output">✓ MarsNMe MCP Gateway listening :18790</span></span>
+          <span class="t-line">&nbsp;</span>
+          <span class="t-line"><span class="t-comment"># Or run a second agent on another port</span></span>
+          <span class="t-line"><span class="t-prompt">$ </span><span class="t-key">MCP_PROFILE</span>=<span class="t-val">assistant-b</span> <span class="t-key">PORT</span>=<span class="t-val">18791</span> <span class="t-cmd">npx @marsnme/mcp-gateway</span></span>
+          <span class="t-line"><span class="t-output">✓ MarsNMe MCP Gateway listening :18791</span></span>
+          <span class="t-line">&nbsp;</span>
+          <span class="t-line"><span class="t-comment"># Health check</span></span>
+          <span class="t-line"><span class="t-prompt">$ </span><span class="t-cmd">curl http://localhost:18790/health</span></span>
+          <span class="t-line"><span class="t-output">{</span></span>
+          <span class="t-line"><span class="t-output">&nbsp;&nbsp;"status": "ok",</span></span>
+          <span class="t-line"><span class="t-output">&nbsp;&nbsp;"profile": "my-agent",</span></span>
+          <span class="t-line"><span class="t-output">&nbsp;&nbsp;"tools": 9,</span></span>
+          <span class="t-line"><span class="t-output">&nbsp;&nbsp;"uptime": 42</span></span>
+          <span class="t-line"><span class="t-output">}</span></span>
+          <span class="t-line">&nbsp;</span>
+          <span class="t-line"><span class="t-prompt">$ </span><span class="cursor"></span></span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FEATURES -->
+<section>
+  <div class="container">
+    <div class="section-label reveal">Features</div>
+    <h2 class="section-title reveal">Everything an agent needs<br>to remember.</h2>
+    <div class="features-grid">
+      <div class="feature-card reveal">
+        <div class="feature-icon">
+          <svg viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+        </div>
+        <div class="feature-title">Semantic Recall</div>
+        <p class="feature-desc">Jina embeddings v3 with 1024 dimensions. Find memories by meaning, not just keywords. pgvector HNSW index for millisecond retrieval.</p>
+        <span class="feature-tag">jina-embeddings-v3</span>
+      </div>
+      <div class="feature-card reveal">
+        <div class="feature-icon">
+          <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        </div>
+        <div class="feature-title">Multi-Profile Isolation</div>
+        <p class="feature-desc">Each agent gets its own schema. Same codebase, zero cross-contamination. Run unlimited profiles with isolated memory spaces.</p>
+        <span class="feature-tag">MCP_PROFILE</span>
+      </div>
+      <div class="feature-card reveal">
+        <div class="feature-icon">
+          <svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        </div>
+        <div class="feature-title">Two-Tier Memory</div>
+        <p class="feature-desc">Short-term session memory with TTL and long-term knowledge chunks that persist forever. Agents know what just happened and what always matters.</p>
+        <span class="feature-tag">memories · marsvault_chunks</span>
+      </div>
+      <div class="feature-card reveal">
+        <div class="feature-icon">
+          <svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+        </div>
+        <div class="feature-title">MCP Native</div>
+        <p class="feature-desc">Full MCP protocol: initialize, tools/list, tools/call, ping. Drop into any MCP-compatible client — Cursor, Claude Desktop, Warp, or your own agent.</p>
+        <span class="feature-tag">Model Context Protocol</span>
+      </div>
+      <div class="feature-card reveal">
+        <div class="feature-icon">
+          <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        </div>
+        <div class="feature-title">Bearer Auth</div>
+        <p class="feature-desc">Optional Bearer token enforcement via <code style="font-family:var(--font-mono);font-size:0.85em;color:var(--color-accent);">MCP_REQUIRE_BEARER</code>. Secure your endpoint for production use.</p>
+        <span class="feature-tag">production-ready</span>
+      </div>
+      <div class="feature-card reveal">
+        <div class="feature-icon">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        </div>
+        <div class="feature-title">One Command Install</div>
+        <p class="feature-desc">Install via npm. No cloning, no build steps. <code style="font-family:var(--font-mono);font-size:0.85em;color:var(--color-accent);">npx @marsnme/mcp-gateway</code> and you're running.</p>
+        <span class="feature-tag">npm · npx</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- INSTALL VIA AGENT -->
+<section id="install" class="install-section">
+  <div class="container">
+    <div class="install-header reveal">
+      <div class="agent-badge">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1H2a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h1a7 7 0 0 1 7-7h1V5.73c-.6-.34-1-.99-1-1.73a2 2 0 0 1 2-2z"/></svg>
+        Agent-Assisted Install
+      </div>
+      <div class="section-label">Installation</div>
+      <h2 class="section-title">One prompt.<br>Your agent installs the rest.</h2>
+      <p class="section-desc">Paste the prompt below into your AI assistant. It will set up Supabase, configure your environment, and start MarsNMe automatically.</p>
+    </div>
+    <div class="install-grid">
+      <div class="agent-steps reveal">
+        <div class="agent-step">
+          <div class="agent-step-icon">
+            <svg viewBox="0 0 24 24"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+          </div>
+          <div class="agent-step-body">
+            <h4>① Paste agent prompt</h4>
+            <p>Copy the install prompt and paste into your AI coding assistant. The agent handles Supabase setup, npm install, and environment config.</p>
+          </div>
+        </div>
+        <div class="agent-step">
+          <div class="agent-step-icon">
+            <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          </div>
+          <div class="agent-step-body">
+            <h4>② Fill your keys</h4>
+            <p>Provide your <code style="font-family:var(--font-mono);font-size:0.85em;color:var(--color-accent);">SUPABASE_BASE_URL</code>, <code style="font-family:var(--font-mono);font-size:0.85em;color:var(--color-accent);">SUPABASE_SERVICE_ROLE_KEY</code> and <code style="font-family:var(--font-mono);font-size:0.85em;color:var(--color-accent);">JINA_API_KEY</code>. Agent writes your <code style="font-family:var(--font-mono);font-size:0.85em;color:var(--color-text-muted);">.env</code> file.</p>
+          </div>
+        </div>
+        <div class="agent-step">
+          <div class="agent-step-icon">
+            <svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+          </div>
+          <div class="agent-step-body">
+            <h4>③ Verify health</h4>
+            <p>Agent runs <code style="font-family:var(--font-mono);font-size:0.85em;color:var(--color-green);">curl http://127.0.0.1:18790/health</code> to verify the gateway responds correctly.</p>
+          </div>
+        </div>
+        <div class="agent-step">
+          <div class="agent-step-icon">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>
+          </div>
+          <div class="agent-step-body">
+            <h4>④ Configure your client</h4>
+            <p>Add the MCP endpoint <code style="font-family:var(--font-mono);font-size:0.85em;color:var(--color-blue);">http://127.0.0.1:18790/mcp</code> to your client config. Start remembering.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="install-terminal reveal">
+        <div class="terminal-bar">
+          <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+          <span class="terminal-title">Agent Install Prompt</span>
+        </div>
+        <div class="install-terminal-body">
+          <div class="profile-tabs">
+            <button class="profile-tab active" onclick="switchTab('cursor')">Cursor</button>
+            <button class="profile-tab" onclick="switchTab('claude')">Claude Desktop</button>
+            <button class="profile-tab" onclick="switchTab('warp')">Warp</button>
+            <button class="profile-tab" onclick="switchTab('manual')">Manual</button>
+          </div>
+
+          <div id="tab-cursor">
+            <div class="cmd-block">
+              <button class="copy-btn" onclick="copyCode(this,'cursor-prompt')">copy</button>
+              <pre id="cursor-prompt"><span style="color:#a78bfa"># Paste this into Cursor Agent (Cmd+L → Agent mode)</span>
+
+<span style="color:#e4e4e7">Please install MarsNMe memory backend for my AI agent:
+1. Read the Quick Start at https://github.com/Marsmanleo/MarsNMe#quick-start
+2. Create a Supabase project (free plan) at https://supabase.com/dashboard/new
+3. Get a Jina API key at https://jina.ai/api-key/
+4. Run migrations from supabase/migrations/ in filename order
+5. Start: MCP_PROFILE=my-agent npx @marsnme/mcp-gateway
+6. Verify: curl http://127.0.0.1:18790/health
+7. Add to Cursor MCP settings:
+   URL: http://127.0.0.1:18790/mcp
+Report health status when done.</span></pre>
+            </div>
+            <div class="install-note">
+              Cursor Agent will handle the entire setup interactively.<br>
+              It will ask for your keys at step 3 — never paste them directly.
+            </div>
+          </div>
+
+          <div id="tab-claude" style="display:none">
+            <div class="cmd-block">
+              <button class="copy-btn" onclick="copyCode(this,'claude-config')">copy</button>
+              <pre id="claude-config"><span style="color:#a78bfa">// claude_desktop_config.json</span>
+<span style="color:#e4e4e7">{
+  "mcpServers": {
+    "marsnme": {
+      "url": "http://127.0.0.1:18790/mcp"
+    }
+  }
+}</span></pre>
+            </div>
+            <div class="install-note">
+              Add to <span style="color:var(--color-text-muted)">~/Library/Application Support/Claude/claude_desktop_config.json</span><br>
+              First start the gateway: <span style="color:var(--color-text-muted)">MCP_PROFILE=my-agent npx @marsnme/mcp-gateway</span>
+            </div>
+          </div>
+
+          <div id="tab-warp" style="display:none">
+            <div class="cmd-block">
+              <button class="copy-btn" onclick="copyCode(this,'warp-config')">copy</button>
+              <pre id="warp-config"><span style="color:#a78bfa"># Warp MCP Server Settings</span>
+
+<span style="color:#e4e4e7">Name: marsnme
+URL: http://127.0.0.1:18790/mcp</span></pre>
+            </div>
+            <div class="install-note">
+              Open <span style="color:var(--color-text-muted)">Settings → Agents → MCP servers</span> and add the server above.<br>
+              First start the gateway: <span style="color:var(--color-text-muted)">MCP_PROFILE=my-agent npx @marsnme/mcp-gateway</span>
+            </div>
+          </div>
+
+          <div id="tab-manual" style="display:none">
+            <div class="cmd-block">
+              <button class="copy-btn" onclick="copyCode(this,'manual-cmd')">copy</button>
+              <pre id="manual-cmd"><span style="color:var(--color-text-faint)"># Prerequisites: Node.js 20+, Supabase project, Jina API key</span>
+
+<span style="color:var(--color-accent)">$</span> <span style="color:var(--color-text)">npx @marsnme/mcp-gateway</span>
+
+<span style="color:var(--color-text-faint)"># Or with environment variables</span>
+<span style="color:var(--color-accent)">$</span> <span style="color:var(--color-green)">MCP_PROFILE</span>=<span style="color:var(--color-text)">my-agent</span> \
+  <span style="color:var(--color-green)">SUPABASE_BASE_URL</span>=<span style="color:var(--color-text)">https://xxx.supabase.co</span> \
+  <span style="color:var(--color-green)">SUPABASE_SERVICE_ROLE_KEY</span>=<span style="color:var(--color-text)">your-key</span> \
+  <span style="color:var(--color-green)">JINA_API_KEY</span>=<span style="color:var(--color-text)">your-key</span> \
+  <span style="color:var(--color-text)">npx @marsnme/mcp-gateway</span>
+
+<span style="color:var(--color-text-faint)"># Verify</span>
+<span style="color:var(--color-accent)">$</span> <span style="color:var(--color-text)">curl http://127.0.0.1:18790/health</span>
+<span style="color:var(--color-green)">{"status":"ok","profile":"my-agent","tools":9}</span></pre>
+            </div>
+            <div class="install-note">
+              Requires: <span style="color:var(--color-text-muted)">Node.js 20+</span> · <span style="color:var(--color-text-muted)">Supabase project</span> · <span style="color:var(--color-text-muted)">JINA_API_KEY</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- TOOLS REFERENCE -->
+<section id="tools">
+  <div class="container">
+    <div class="section-label reveal">API Reference</div>
+    <h2 class="section-title reveal">9 tools. Everything<br>your agent needs.</h2>
+    <div class="tools-grid">
+      <div class="tool-row reveal">
+        <span class="tool-name">insert_memory</span>
+        <div class="tool-info">
+          <h4>Write short-term memory <span class="memory-badge badge-short">SHORT</span></h4>
+          <p>Store session context and recent interactions. Auto-routes to your profile's memories table. ~30 day TTL.</p>
+        </div>
+      </div>
+      <div class="tool-row reveal">
+        <span class="tool-name">list_memories</span>
+        <div class="tool-info">
+          <h4>List recent memories <span class="memory-badge badge-short">SHORT</span></h4>
+          <p>Retrieve recent short-term memories in reverse chronological order. Supports limit and source filters.</p>
+        </div>
+      </div>
+      <div class="tool-row reveal">
+        <span class="tool-name">search_memories</span>
+        <div class="tool-info">
+          <h4>Semantic search short-term <span class="memory-badge badge-short">SHORT</span></h4>
+          <p>Jina-powered semantic search over session memories. Returns similarity scores. Ideal for contextual lookups.</p>
+        </div>
+      </div>
+      <div class="tool-row reveal">
+        <span class="tool-name">recall</span>
+        <div class="tool-info">
+          <h4>Semantic recall long-term <span class="memory-badge badge-long">LONG</span></h4>
+          <p>Deep semantic search over marsvault_chunks. Routes to your profile schema. Supports type, visibility, and similarity filters.</p>
+        </div>
+      </div>
+      <div class="tool-row reveal">
+        <span class="tool-name">memory_ingest</span>
+        <div class="tool-info">
+          <h4>Ingest long-term insight <span class="memory-badge badge-long">LONG</span></h4>
+          <p>Chunk and embed insight content into marsvault_chunks. Supports visibility (private/shared/global), tags, and custom chunk sizes.</p>
+        </div>
+      </div>
+      <div class="tool-row reveal">
+        <span class="tool-name">dream_ingest</span>
+        <div class="tool-info">
+          <h4>Ingest digest content <span class="memory-badge badge-long">LONG</span></h4>
+          <p>Specialized tool for ingesting structured digest reports as long-term knowledge. Auto-chunks and indexes for semantic retrieval.</p>
+        </div>
+      </div>
+      <div class="tool-row reveal">
+        <span class="tool-name">session_boot</span>
+        <div class="tool-info">
+          <h4>Session startup rhythm <span class="memory-badge badge-ops">OPS</span></h4>
+          <p>One-call session boot: identity recall, workflow status, health snapshot, and heartbeat sign-in. Run at session start.</p>
+        </div>
+      </div>
+      <div class="tool-row reveal">
+        <span class="tool-name">session_close</span>
+        <div class="tool-info">
+          <h4>Session close summary <span class="memory-badge badge-ops">OPS</span></h4>
+          <p>Store session close summary with configurable retention. Captures topics, mood, and key outcomes for next session.</p>
+        </div>
+      </div>
+      <div class="tool-row reveal">
+        <span class="tool-name">health_check</span>
+        <div class="tool-info">
+          <h4>Memory diagnostics <span class="memory-badge badge-ops">OPS</span></h4>
+          <p>Run coverage map, expiry alerts, and conflict detection across your memory tables. Essential for maintenance.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ENV VARS -->
+<section style="padding-top:0;">
+  <div class="container">
+    <div class="section-label reveal">Configuration</div>
+    <h3 class="section-title" style="font-size:var(--text-xl)">Environment Variables</h3>
+    <div class="env-grid reveal">
+      <div class="env-item">
+        <div><span class="env-key">MCP_PROFILE</span><span class="env-required">required</span></div>
+        <div class="env-desc">Your profile identifier. Routes all reads/writes to the corresponding schema. Use any name you want.</div>
+      </div>
+      <div class="env-item">
+        <div><span class="env-key">SUPABASE_BASE_URL</span><span class="env-required">required</span></div>
+        <div class="env-desc">Supabase REST API project URL (e.g. https://xxx.supabase.co).</div>
+      </div>
+      <div class="env-item">
+        <div><span class="env-key">SUPABASE_SERVICE_ROLE_KEY</span><span class="env-required">required</span></div>
+        <div class="env-desc">Supabase service role key with schema access. Never expose in client-side code.</div>
+      </div>
+      <div class="env-item">
+        <div><span class="env-key">JINA_API_KEY</span><span class="env-required">required</span></div>
+        <div class="env-desc">Jina AI API key for generating embeddings. Required for search_memories, recall, and ingest tools.</div>
+      </div>
+      <div class="env-item">
+        <div><span class="env-key">PORT</span><span class="env-optional">optional</span></div>
+        <div class="env-desc">Default: 18790. Override for running multiple profiles on different ports.</div>
+      </div>
+      <div class="env-item">
+        <div><span class="env-key">MCP_REQUIRE_BEARER</span><span class="env-optional">optional</span></div>
+        <div class="env-desc">Set true for production. Enforces Bearer token auth on all MCP endpoints.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="cta-section">
+  <div class="container">
+    <div class="section-label reveal" style="text-align:center;">Open Source</div>
+    <h2 class="section-title reveal" style="text-align:center;">Your AI deserves to<br><span style="color:var(--color-accent)">remember you.</span></h2>
+    <p class="section-desc reveal" style="margin:0 auto var(--space-10);text-align:center;">Apache 2.0. Self-host, fork, extend. Built by Mars Group — a Macau company building the future of human-AI symbiosis.</p>
+    <div class="cta-actions reveal">
+      <a href="https://github.com/Marsmanleo/MarsNMe" target="_blank" rel="noopener noreferrer" class="btn-primary">Star on GitHub →</a>
+      <a href="https://github.com/Marsmanleo/MarsNMe/issues" target="_blank" rel="noopener noreferrer" class="btn-ghost">Open an Issue</a>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div style="display:flex;align-items:center;justify-content:center;gap:var(--space-6);flex-wrap:wrap;">
+    <span>Built by <a href="https://github.com/marsmanleo" target="_blank" rel="noopener noreferrer">Mars Group</a> · Macau</span>
+    <span style="color:var(--color-text-faint)">·</span>
+    <a href="https://github.com/Marsmanleo/MarsNMe" target="_blank" rel="noopener noreferrer">GitHub</a>
+    <span style="color:var(--color-text-faint)">·</span>
+    <span>Apache 2.0</span>
+    <span style="color:var(--color-text-faint)">·</span>
+    <a href="https://www.npmjs.com/package/@marsnme/mcp-gateway" target="_blank" rel="noopener noreferrer">npm</a>
+  </div>
+</footer>
+
+<script>
+// Tab switching
+function switchTab(tab) {
+  ['cursor','claude','warp','manual'].forEach(t => {
+    document.getElementById('tab-'+t).style.display = t===tab?'block':'none';
+  });
+  document.querySelectorAll('.profile-tab').forEach((btn,i) => {
+    btn.classList.toggle('active', ['cursor','claude','warp','manual'][i]===tab);
+  });
+}
+
+// Copy button
+function copyCode(btn, id) {
+  const el = document.getElementById(id);
+  const text = el.innerText || el.textContent;
+  navigator.clipboard.writeText(text).then(() => {
+    btn.textContent = 'copied!';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = 'copy'; btn.classList.remove('copied'); }, 2000);
+  });
+}
+
+// Reveal on scroll
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(e => { if(e.isIntersecting) { e.target.classList.add('visible'); } });
+}, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+
+// Animate stat numbers
+function animateNum(el, target, duration=1200) {
+  let start=0, startTime=null;
+  function step(ts) {
+    if(!startTime) startTime=ts;
+    const progress = Math.min((ts-startTime)/duration,1);
+    const eased = 1-Math.pow(1-progress,3);
+    el.textContent = Math.round(eased*target);
+    if(progress<1) requestAnimationFrame(step);
+  }
+  requestAnimationFrame(step);
+}
+const statsObserver = new IntersectionObserver((entries) => {
+  entries.forEach(e => {
+    if(e.isIntersecting) {
+      animateNum(document.getElementById('stat-tools'),9);
+      statsObserver.disconnect();
+    }
+  });
+},{threshold:0.5});
+const statEl = document.getElementById('stat-tools');
+if(statEl) statsObserver.observe(statEl.closest('.hero-stats'));
+</script>
+</body>
+</html>
