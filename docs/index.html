@@ -611,6 +611,10 @@ Report health status when done.</span></pre>
               Add to <span style="color:var(--color-text-muted)">~/Library/Application Support/Claude/claude_desktop_config.json</span><br>
               First start the gateway: <span style="color:var(--color-text-muted)">MCP_PROFILE=my-agent npx @marsnme/mcp-gateway</span>
             </div>
+            <button class="copy-config-btn" onclick="copyFullConfig(this)" style="margin-top:var(--space-3);font-family:var(--font-mono);font-size:var(--text-xs);padding:8px 16px;background:var(--color-accent-dim);border:1px solid rgba(249,115,22,0.35);border-radius:var(--radius-sm);color:var(--color-accent);cursor:pointer;transition:all 150ms;display:flex;align-items:center;gap:6px;">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+              Copy full claude_desktop_config.json
+            </button>
           </div>
 
           <div id="tab-warp" style="display:none">
@@ -836,6 +840,30 @@ function copyCode(btn, id) {
     btn.textContent = 'copied!';
     btn.classList.add('copied');
     setTimeout(() => { btn.textContent = 'copy'; btn.classList.remove('copied'); }, 2000);
+  });
+}
+
+// Copy full claude_desktop_config.json
+function copyFullConfig(btn) {
+  const config = JSON.stringify({
+    mcpServers: {
+      marsnme: {
+        url: "http://127.0.0.1:18790/mcp"
+      }
+    }
+  }, null, 2);
+  navigator.clipboard.writeText(config).then(() => {
+    const orig = btn.innerHTML;
+    btn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Copied!';
+    btn.style.color = 'var(--color-green)';
+    btn.style.borderColor = 'rgba(34,197,94,0.35)';
+    btn.style.background = 'var(--color-green-dim)';
+    setTimeout(() => {
+      btn.innerHTML = orig;
+      btn.style.color = '';
+      btn.style.borderColor = '';
+      btn.style.background = '';
+    }, 2000);
   });
 }
 
