@@ -374,6 +374,34 @@ footer a:hover{color:var(--color-text);}
   </div>
 </section>
 
+<!-- SOCIAL CARDS -->
+<section id="social-cards" style="padding:var(--space-20) 0;border-top:1px solid var(--color-border);">
+  <div class="container">
+    <div class="section-label reveal" style="text-align:center;">Why MarsNMe</div>
+    <h2 class="section-title reveal" style="text-align:center;margin-bottom:var(--space-10);">The difference memory makes.</h2>
+
+    <!-- Hero card -->
+    <div class="reveal" style="margin-bottom:var(--space-8);border-radius:var(--radius);overflow:hidden;border:1px solid var(--color-border);">
+      <img src="assets/social-concept.png" alt="Your AI finally remembers you — MarsNMe" style="width:100%;display:block;" loading="lazy">
+    </div>
+
+    <!-- Compare + Arch side by side -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-6);" class="reveal">
+      <div style="border-radius:var(--radius);overflow:hidden;border:1px solid var(--color-border);">
+        <img src="assets/social-compare.png" alt="Without vs With MarsNMe" style="width:100%;display:block;" loading="lazy">
+      </div>
+      <div style="border-radius:var(--radius);overflow:hidden;border:1px solid var(--color-border);">
+        <img src="assets/social-arch.png" alt="How MarsNMe works" style="width:100%;display:block;" loading="lazy">
+      </div>
+    </div>
+
+    <!-- Mobile: stack vertically -->
+    <style>
+      @media(max-width:640px){#social-cards .reveal>div,#social-cards [style*="grid"]{grid-template-columns:1fr!important;}}
+    </style>
+  </div>
+</section>
+
 <!-- HOW IT WORKS -->
 <section id="how">
   <div class="container">
