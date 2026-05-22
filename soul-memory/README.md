@@ -1,4 +1,9 @@
 # @marsnme/mcp-gateway
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/Marsmanleo/MarsNMe/main/docs/assets/demo.gif" alt="MarsNMe demo" width="640" />
+</p>
+
 MarsNMe MCP Gateway for memory tools over streamable HTTP transport.
 
 This package runs an MCP server at `POST /mcp` and exposes health status at `GET /health`.
@@ -23,8 +28,8 @@ After startup:
 
 ## Required environment variables
 - `MCP_PROFILE`
-  - Supported values: `coco` or `toto`
-  - Default: `coco`
+  - Any lowercase profile ID matching `^[a-z][a-z0-9_-]*$` (for example: `coco`, `toto`, `my-agent`)
+  - Legacy built-in IDs: `coco` and `toto`
 - `SUPABASE_BASE_URL`
   - Your Supabase REST project URL
 - `SUPABASE_SERVICE_ROLE_KEY` (recommended) or `SUPABASE_SERVICE_KEY`
@@ -34,7 +39,7 @@ After startup:
 
 ## Common optional environment variables
 - `PORT`
-  - Overrides default port (`18790` for `coco`, `18791` for `toto`)
+  - Overrides default port (`18790`)
 - `MCP_REQUIRE_BEARER`
   - Set `true` to require `Authorization: Bearer <token>` on MCP calls
 - `MCP_OAUTH_ENABLED`
