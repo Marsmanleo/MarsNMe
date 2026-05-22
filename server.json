@@ -46,8 +46,7 @@
         },
         {
           "name": "PORT",
-          "description": "Local HTTP port for the MCP endpoint.",
-          "default": "18790"
+          "description": "Local HTTP port for the MCP endpoint. If omitted, defaults by MCP_PROFILE (coco=18790, toto=18791, others deterministic in 20000-29999)."
         }
       ]
     }

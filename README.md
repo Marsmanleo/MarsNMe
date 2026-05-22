@@ -116,8 +116,9 @@ npx supabase db push --db-url "<your-supabase-db-connection-string>"
    - `MCP_PROFILE` separates memory by agent or use case.
    - Use any profile name you want (for example: `default`, `my-agent`, `profile-a`).
    - Legacy built-in profile IDs `coco` and `toto` are still supported for compatibility.
+   - If `PORT` is omitted, default port is profile-based (`coco=18790`, `toto=18791`, other profiles deterministic in `20000-29999`).
 ```bash
-MCP_PROFILE=profile-a npx @marsnme/mcp-gateway
+MCP_PROFILE=profile-a PORT=18790 npx @marsnme/mcp-gateway
 ```
 7. Verify health:
 ```bash

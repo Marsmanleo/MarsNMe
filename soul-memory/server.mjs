@@ -45,6 +45,19 @@ const PROFILE_CONFIGS = {
     memoryIngestFixedTags: ['toto', 'insight']
   }
 };
+const PROFILE_DEFAULT_PORT_RANGE_START = 20000;
+const PROFILE_DEFAULT_PORT_RANGE_SIZE = 10000;
+const PROFILE_LEGACY_DEFAULT_PORTS = {
+  coco: 18790,
+  toto: 18791
+};
+function resolveProfileDefaultPort(profileId) {
+  const legacyPort = PROFILE_LEGACY_DEFAULT_PORTS[profileId];
+  if (Number.isInteger(legacyPort)) return legacyPort;
+  const hash = crypto.createHash('sha256').update(profileId).digest();
+  const slot = hash.readUInt16BE(0) % PROFILE_DEFAULT_PORT_RANGE_SIZE;
+  return PROFILE_DEFAULT_PORT_RANGE_START + slot;
+}
 const PROFILE_ID_PATTERN = /^[a-z][a-z0-9_-]*$/;
 function buildProfileConfig(profileId) {
   const legacyProfile = PROFILE_CONFIGS[profileId];
@@ -53,7 +66,7 @@ function buildProfileConfig(profileId) {
     ...PROFILE_CONFIGS.coco,
     schema: profileId,
     displayName: profileId,
-    defaultPort: 18790,
+    defaultPort: resolveProfileDefaultPort(profileId),
     gatewayDir: `${profileId}-mcp-gateway`,
     publicHostSuffix: `${profileId}-mcp.marsgroup.asia`,
     recallBodyEnum: [profileId, 'system'],
@@ -151,7 +164,12 @@ function setMemorySourceWhitelist(nextSources) {
 }
 setMemorySourceWhitelist(buildMemorySourceListForMode());
 
-const PORT = Number.parseInt(process.env.PORT || '18790', 10);
+const PORT_RAW = String(process.env.PORT || '').trim();
+const PORT_SOURCE = PORT_RAW ? 'env' : 'profile-default';
+const PORT = Number.parseInt(PORT_RAW || String(PROFILE.defaultPort), 10);
+if (!Number.isInteger(PORT) || PORT < 1 || PORT > 65535) {
+  throw new Error(`Invalid PORT: ${PORT_RAW || String(PORT)}. Must be an integer between 1 and 65535.`);
+}
 const SUPABASE_BASE_URL = process.env.SUPABASE_BASE_URL || 'http://127.0.0.1:8100';
 const OAUTH_ENABLED = process.env.MCP_OAUTH_ENABLED !== 'false';
 const REQUIRE_BEARER = process.env.MCP_REQUIRE_BEARER === 'true';
@@ -4336,8 +4354,27 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
+server.on('error', (error) => {
+  if (error?.code === 'EADDRINUSE') {
+    const hint =
+      PORT_SOURCE === 'env'
+        ? `Set PORT to an unused value (current PORT=${PORT}).`
+        : `Set PORT to an unused value or use another MCP_PROFILE (profile=${MCP_PROFILE}, default_port=${PROFILE.defaultPort}).`;
+    console.error(`[fatal] ${SERVER_NAME} cannot start: port ${PORT} is already in use. ${hint}`);
+    process.exit(1);
+    return;
+  }
+  console.error(
+    `[fatal] ${SERVER_NAME} failed to start: ${String(error?.message || error)}`
+  );
+  process.exit(1);
+});
+
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`${SERVER_NAME} listening on 0.0.0.0:${PORT}`);
+  console.log(
+    `[config] profile=${MCP_PROFILE} resolved_port=${PORT} source=${PORT_SOURCE} profile_default_port=${PROFILE.defaultPort}`
+  );
   console.log(`[config] source_mode=${SOURCE_MODE}`);
   if (SOURCE_MODE === 'registry') {
     void reloadSourceRegistryCache()

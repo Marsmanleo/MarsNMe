@@ -39,7 +39,11 @@ After startup:
 
 ## Common optional environment variables
 - `PORT`
-  - Overrides default port (`18790`)
+  - Overrides the HTTP port used by the gateway
+  - If omitted, the gateway resolves a profile-based default:
+    - `coco` → `18790`
+    - `toto` → `18791`
+    - other profile IDs → deterministic port in `20000-29999`
 - `MCP_REQUIRE_BEARER`
   - Set `true` to require `Authorization: Bearer <token>` on MCP calls
 - `MCP_OAUTH_ENABLED`
