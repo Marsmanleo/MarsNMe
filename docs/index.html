@@ -235,7 +235,7 @@ footer a:hover{color:var(--color-text);}
       </a>
     </div>
     <div class="hero-stats">
-      <div class="stat"><span class="stat-num" id="stat-tools">9</span><span class="stat-label">MCP Tools</span></div>
+      <div class="stat"><span class="stat-num" id="stat-tools">13</span><span class="stat-label">MCP Tools</span></div>
       <div class="stat"><span class="stat-num">∞</span><span class="stat-label">Profiles</span></div>
       <div class="stat"><span class="stat-num">1024</span><span class="stat-label">Embedding Dims</span></div>
       <div class="stat"><span class="stat-num">∞</span><span class="stat-label">Memory Horizon</span></div>
@@ -502,7 +502,7 @@ URL: http://127.0.0.1:18790/mcp</span></pre>
 
 <span style="color:var(--color-text-faint)"># Verify</span>
 <span style="color:var(--color-accent)">$</span> <span style="color:var(--color-text)">curl http://127.0.0.1:18790/health</span>
-<span style="color:var(--color-green)">{"status":"ok","profile":"my-agent","tools":9}</span></pre>
+<span style="color:var(--color-green)">{"status":"ok","profile":"my-agent","tools":13}</span></pre>
             </div>
             <div class="install-note">
               Requires: <span style="color:var(--color-text-muted)">Node.js 20+</span> · <span style="color:var(--color-text-muted)">Supabase project</span> · <span style="color:var(--color-text-muted)">JINA_API_KEY</span>
@@ -518,7 +518,7 @@ URL: http://127.0.0.1:18790/mcp</span></pre>
 <section id="tools">
   <div class="container">
     <div class="section-label reveal">API Reference</div>
-    <h2 class="section-title reveal">9 tools. Everything<br>your agent needs.</h2>
+    <h2 class="section-title reveal">13 tools. Everything<br>your agent needs.</h2>
     <div class="tools-grid">
       <div class="tool-row reveal">
         <span class="tool-name">insert_memory</span>
@@ -581,6 +581,34 @@ URL: http://127.0.0.1:18790/mcp</span></pre>
         <div class="tool-info">
           <h4>Memory diagnostics <span class="memory-badge badge-ops">OPS</span></h4>
           <p>Run coverage map, expiry alerts, and conflict detection across your memory tables. Essential for maintenance.</p>
+        </div>
+      </div>
+      <div class="tool-row reveal">
+        <span class="tool-name">reload_source_registry</span>
+        <div class="tool-info">
+          <h4>Reload source registry <span class="memory-badge badge-ops">OPS</span></h4>
+          <p>Refresh the memory source whitelist from configuration. Add or remove sources without restarting the gateway.</p>
+        </div>
+      </div>
+      <div class="tool-row reveal">
+        <span class="tool-name">demote_memory</span>
+        <div class="tool-info">
+          <h4>Demote long-term chunk <span class="memory-badge badge-long">LONG</span></h4>
+          <p>Reduce the priority or visibility of a long-term memory chunk. Soft downgrade without permanent deletion.</p>
+        </div>
+      </div>
+      <div class="tool-row reveal">
+        <span class="tool-name">soft_forget</span>
+        <div class="tool-info">
+          <h4>Soft forget memory <span class="memory-badge badge-ops">OPS</span></h4>
+          <p>Mark a memory as forgotten without deleting it. The memory stays in storage but is excluded from normal recall.</p>
+        </div>
+      </div>
+      <div class="tool-row reveal">
+        <span class="tool-name">explain_memory</span>
+        <div class="tool-info">
+          <h4>Explain memory content <span class="memory-badge badge-ops">OPS</span></h4>
+          <p>Get a human-readable explanation of a specific memory entry. Shows metadata, source, tags, and relevance context.</p>
         </div>
       </div>
     </div>
@@ -690,7 +718,7 @@ function animateNum(el, target, duration=1200) {
 const statsObserver = new IntersectionObserver((entries) => {
   entries.forEach(e => {
     if(e.isIntersecting) {
-      animateNum(document.getElementById('stat-tools'),9);
+      animateNum(document.getElementById('stat-tools'),13);
       statsObserver.disconnect();
     }
   });

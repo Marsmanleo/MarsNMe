@@ -154,9 +154,11 @@ This public repository currently keeps two built-in legacy profile IDs (`coco`, 
   - `list_memories`
   - `search_memories` (Jina embedding search)
   - `recall` (long-term chunk recall from profile schema)
-  - `health_check` (coverage, expiry, conflict diagnostics)
+  - `memory_ingest` / `dream_ingest` (long-term chunk ingestion)
   - `session_boot` / `session_close` (daily rhythm lifecycle)
-  - `dream_ingest` / `memory_ingest` (long-term chunk ingestion)
+  - `health_check` (coverage, expiry, conflict diagnostics)
+  - `reload_source_registry` (refresh source whitelist at runtime)
+  - `demote_memory` / `soft_forget` / `explain_memory` (memory lifecycle management)
 - OAuth-protected MCP endpoint (configurable by environment variables)
 
 ## Memory model
