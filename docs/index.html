@@ -382,16 +382,16 @@ footer a:hover{color:var(--color-text);}
 
     <!-- Hero card -->
     <div class="reveal" style="margin-bottom:var(--space-8);border-radius:var(--radius);overflow:hidden;border:1px solid var(--color-border);">
-      <img src="assets/social-concept.png" alt="Your AI finally remembers you — MarsNMe" style="width:100%;display:block;" loading="lazy">
+      <img src="assets/social-concept.png" data-dark="assets/social-concept.png" data-light="assets/social-concept-light.png" alt="Your AI finally remembers you — MarsNMe" style="width:100%;display:block;" class="theme-img" loading="lazy">
     </div>
 
     <!-- Compare + Arch side by side -->
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-6);" class="reveal">
       <div style="border-radius:var(--radius);overflow:hidden;border:1px solid var(--color-border);">
-        <img src="assets/social-compare.png" alt="Without vs With MarsNMe" style="width:100%;display:block;" loading="lazy">
+        <img src="assets/social-compare.png" data-dark="assets/social-compare.png" data-light="assets/social-compare-light.png" alt="Without vs With MarsNMe" style="width:100%;display:block;" class="theme-img" loading="lazy">
       </div>
       <div style="border-radius:var(--radius);overflow:hidden;border:1px solid var(--color-border);">
-        <img src="assets/social-arch.png" alt="How MarsNMe works" style="width:100%;display:block;" loading="lazy">
+        <img src="assets/social-arch.png" data-dark="assets/social-arch.png" data-light="assets/social-arch-light.png" alt="How MarsNMe works" style="width:100%;display:block;" class="theme-img" loading="lazy">
       </div>
     </div>
 
@@ -940,6 +940,11 @@ if(statEl) statsObserver.observe(statEl.closest('.hero-stats'));
 <script>
 (function(){
   var STORAGE_KEY='marsnme-theme';
+  function updateThemeImgs(theme) {
+    document.querySelectorAll('.theme-img').forEach(function(img) {
+      img.src = theme === 'light' ? img.dataset.light : img.dataset.dark;
+    });
+  }
   var btn=document.getElementById('theme-toggle');
   var html=document.documentElement;
 
