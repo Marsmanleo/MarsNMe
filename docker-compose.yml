@@ -61,7 +61,7 @@ services:
       SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY:-local-dev-service-role}
       MCP_REQUIRE_BEARER: "false"
       JINA_API_KEY: ${JINA_API_KEY}
-    command: ["/bin/sh", "-lc", "npx -y @marsnme/mcp-gateway@0.1.4"]
+    command: ["/bin/sh", "-lc", "npx -y @marsnme/mcp-gateway@0.1.5"]
     ports:
       - "127.0.0.1:18790:18790"
 
@@ -79,7 +79,7 @@ services:
       SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY:-local-dev-service-role}
       MCP_REQUIRE_BEARER: ${MCP_TUNNEL_REQUIRE_BEARER:-false}
       JINA_API_KEY: ${JINA_API_KEY}
-    command: ["/bin/sh", "-lc", "npx -y @marsnme/mcp-gateway@0.1.4"]
+    command: ["/bin/sh", "-lc", "npx -y @marsnme/mcp-gateway@0.1.5"]
 
   tunnel:
     image: cloudflare/cloudflared:latest
