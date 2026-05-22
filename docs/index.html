@@ -962,6 +962,7 @@ if(statEl) statsObserver.observe(statEl.closest('.hero-stats'));
       btn.title='Switch to light mode';
     }
     try{localStorage.setItem(STORAGE_KEY,t);}catch(e){}
+    updateThemeImgs(t);
   }
 
   // Init: check localStorage, then system preference
