@@ -6,11 +6,32 @@ MarsNMe is built on a symbiosis philosophy: shared memory should strengthen trus
 
 An agent-agnostic, LLM-agnostic memory backend for MCP-compatible tools.
 
-[![npm version](https://img.shields.io/npm/v/@marsnme/mcp-gateway?color=%23E5484D&label=npm)](https://www.npmjs.com/package/@marsnme/mcp-gateway) [![MCP Registry](https://img.shields.io/badge/MCP_Registry-listed-%2300A67E?logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHBhdGggZmlsbD0id2hpdGUiIGQ9Ik0xMiAyQzYuNDggMiAyIDYuNDggMiAxMnM0LjQ4IDEwIDEwIDEwIDEwLTQuNDggMTAtMTBTMTcuNTIgMiAxMiAyem0tMSAxN1Y5bDQgNHY0aC00eiIvPjwvc3ZnPg==)](https://registry.modelcontextprotocol.io/v0.1/servers?search=marsnme) [![License](https://img.shields.io/badge/license-Apache--2.0-%23D22128)](LICENSE) [![GitHub stars](https://img.shields.io/github/stars/Marsmanleo/MarsNMe?style=social)](https://github.com/Marsmanleo/MarsNMe)
+[![npm version](https://img.shields.io/npm/v/@marsnme/mcp-gateway?color=%23E5484D&label=npm)](https://www.npmjs.com/package/@marsnme/mcp-gateway) [![MCP Registry](https://img.shields.io/badge/MCP_Registry-listed-%2300A67E?logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHBhdGggZmlsbD0id2hpdGUiIGQ9Ik0xMiAyQzYuNDggMiAyIDYuNDggMiAxMnM0LjQ4IDEwIDEwIDEwIDEwLTQuNDggMTAtMTBTMTcuNTIgMiAxMiAyem0tMSAxN1Y5bDQgNHY0aC00eiIvPjwvc3ZnPg==)](https://registry.modelcontextprotocol.io/v0.1/servers?search=marsnme) [![npm downloads](https://img.shields.io/npm/dm/@marsnme/mcp-gateway?color=%23E5484D&label=downloads)](https://www.npmjs.com/package/@marsnme/mcp-gateway) [![License](https://img.shields.io/badge/license-Apache--2.0-%23D22128)](LICENSE) [![GitHub stars](https://img.shields.io/github/stars/Marsmanleo/MarsNMe?style=social)](https://github.com/Marsmanleo/MarsNMe)
 
 <p align="center">
-  <img src="docs/assets/demo.gif" alt="MarsNMe demo" width="640" />
+  <img src="docs/assets/demo.gif" alt="MarsNMe dark mode demo" width="640" />
 </p>
+<p align="center">
+  <img src="docs/assets/demo-light.gif" alt="MarsNMe light mode demo" width="640" />
+</p>
+
+## Available MCP Tools (13)
+
+| Tool | Description |
+|---|---|
+| `insert_memory` | Store short-term memory |
+| `list_memories` | List recent memories |
+| `search_memories` | Semantic search via Jina embeddings |
+| `recall` | Long-term chunk recall from profile schema |
+| `memory_ingest` | Ingest long-term insight chunks |
+| `dream_ingest` | Dream-mode long-term ingestion |
+| `session_boot` | Start a session with context pre-load |
+| `session_close` | Close session and summarize |
+| `health_check` | Coverage, expiry, conflict diagnostics |
+| `reload_source_registry` | Refresh source whitelist at runtime |
+| `demote_memory` | Demote a memory to lower priority |
+| `soft_forget` | Soft-delete a memory |
+| `explain_memory` | Explain a memory's provenance |
 
 # MarsNMe
 ## Before You Start (External Dependencies)
