@@ -34,6 +34,32 @@ An agent-agnostic, LLM-agnostic memory backend for MCP-compatible tools.
 | `explain_memory` | Explain a memory's provenance |
 
 # MarsNMe
+## Why MarsNMe?
+
+Most AI memory tools help AI remember you. **MarsNMe helps you and your AI remember each other.**
+
+| | MarsNMe | Typical memory tool |
+|---|---|---|
+| **Philosophy** | Mutual continuity — human + AI both grow | AI-side context injection only |
+| **Agent support** | Any MCP-compatible client | Often client-specific |
+| **Memory tiers** | Short-term (TTL) + long-term (semantic) | Usually one layer |
+| **Profiles** | Unlimited isolated profiles via `MCP_PROFILE` | Single-user only |
+| **Data ownership** | Your own Supabase — zero vendor lock-in | Vendor-hosted |
+| **Search** | Jina v3 semantic search (1024-dim pgvector) | Keyword or basic similarity |
+| **Self-hostable** | ✅ Full control | Rarely |
+
+### When MarsNMe is the right fit
+
+- You use multiple AI assistants (Claude, Cursor, Warp, custom agents) and want **shared memory across all of them**
+- You want AI that remembers your projects, preferences, and decisions **across sessions** without re-explaining
+- You care about **data sovereignty** — your memories stay in your own Supabase project
+- You're building an AI agent and need a **production-ready memory backend** with semantic recall
+
+### When it might not be the right fit
+
+- You only need single-session context (just use the system prompt)
+- You want fully managed, zero-config memory with no setup (try a hosted solution)
+
 ## Before You Start (External Dependencies)
 1. Create a Supabase project (free plan is enough):
    - Sign up: https://supabase.com
