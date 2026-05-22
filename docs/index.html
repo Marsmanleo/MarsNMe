@@ -426,10 +426,32 @@ footer a:hover{color:var(--color-text);}
         </div>
         <div class="install-terminal-body">
           <div class="profile-tabs">
+            <button class="profile-tab" onclick="switchTab('docker')">Try in 30 seconds</button>
             <button class="profile-tab active" onclick="switchTab('cursor')">Cursor</button>
             <button class="profile-tab" onclick="switchTab('claude')">Claude Desktop</button>
             <button class="profile-tab" onclick="switchTab('warp')">Warp</button>
             <button class="profile-tab" onclick="switchTab('manual')">Manual</button>
+          </div>
+
+          <div id="tab-docker" style="display:none">
+            <div class="cmd-block">
+              <button class="copy-btn" onclick="copyCode(this,'docker-quickstart')">copy</button>
+              <pre id="docker-quickstart"><span style="color:var(--color-text-faint)"># M1 local demo</span>
+<span style="color:var(--color-accent)">$</span> <span style="color:var(--color-text)">cp .env.example .env</span>
+<span style="color:var(--color-accent)">$</span> <span style="color:var(--color-text)"># fill JINA_API_KEY in .env</span>
+<span style="color:var(--color-accent)">$</span> <span style="color:var(--color-text)">docker compose up</span>
+<span style="color:var(--color-green)"># local endpoint: http://127.0.0.1:18790/mcp</span>
+<span style="color:var(--color-green)"># health: curl http://127.0.0.1:18790/health</span>
+
+<span style="color:var(--color-text-faint)"># M2 optional quick tunnel (demo only)</span>
+<span style="color:var(--color-accent)">$</span> <span style="color:var(--color-text)">docker compose --profile tunnel up</span>
+<span style="color:var(--color-green)"># expected log: https://xxxx.trycloudflare.com</span>
+<span style="color:var(--color-green)"># public MCP URL: https://xxxx.trycloudflare.com/mcp</span></pre>
+            </div>
+            <div class="install-note">
+              Fastest trial path: Docker Desktop + <span style="color:var(--color-text-muted)">JINA_API_KEY</span> only.<br>
+              <span style="color:var(--color-text-muted)">trycloudflare.com</span> URL is temporary and intended for demos.
+            </div>
           </div>
 
           <div id="tab-cursor">
@@ -678,11 +700,12 @@ URL: http://127.0.0.1:18790/mcp</span></pre>
 <script>
 // Tab switching
 function switchTab(tab) {
-  ['cursor','claude','warp','manual'].forEach(t => {
+  const tabs = ['docker','cursor','claude','warp','manual'];
+  tabs.forEach(t => {
     document.getElementById('tab-'+t).style.display = t===tab?'block':'none';
   });
   document.querySelectorAll('.profile-tab').forEach((btn,i) => {
-    btn.classList.toggle('active', ['cursor','claude','warp','manual'][i]===tab);
+    btn.classList.toggle('active', tabs[i]===tab);
   });
 }
 
