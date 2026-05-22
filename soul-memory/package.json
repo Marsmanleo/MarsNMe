@@ -14,10 +14,19 @@
   "keywords": [
     "mcp",
     "memory",
-    "ai",
-    "symbiosis",
+    "ai-memory",
+    "persistent-memory",
+    "ai-agent",
+    "model-context-protocol",
+    "semantic-search",
+    "supabase",
+    "jina",
     "embedding",
-    "supabase"
+    "typescript",
+    "session-memory",
+    "cross-session",
+    "llm",
+    "symbiosis"
   ],
   "bin": {
     "marsnme": "server.mjs"
