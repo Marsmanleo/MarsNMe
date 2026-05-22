@@ -45,15 +45,31 @@ const PROFILE_CONFIGS = {
     memoryIngestFixedTags: ['toto', 'insight']
   }
 };
+const PROFILE_ID_PATTERN = /^[a-z][a-z0-9_-]*$/;
+function buildProfileConfig(profileId) {
+  const legacyProfile = PROFILE_CONFIGS[profileId];
+  if (legacyProfile) return legacyProfile;
+  return {
+    ...PROFILE_CONFIGS.coco,
+    schema: profileId,
+    displayName: profileId,
+    defaultPort: 18790,
+    gatewayDir: `${profileId}-mcp-gateway`,
+    publicHostSuffix: `${profileId}-mcp.marsgroup.asia`,
+    recallBodyEnum: [profileId, 'system'],
+    memoryIngestLegacyToolNames: [],
+    memoryIngestDefaultOrigin: `warp-${profileId}`,
+    memoryIngestOriginEnum: null,
+    memoryIngestFixedTags: [profileId, 'insight']
+  };
+}
 const MCP_PROFILE = String(process.env.MCP_PROFILE || 'coco')
   .trim()
   .toLowerCase();
-const PROFILE = PROFILE_CONFIGS[MCP_PROFILE];
-if (!PROFILE) {
-  throw new Error(
-    `Invalid MCP_PROFILE: ${MCP_PROFILE}. Supported values: ${Object.keys(PROFILE_CONFIGS).join('/')}`
-  );
+if (!MCP_PROFILE || !PROFILE_ID_PATTERN.test(MCP_PROFILE)) {
+  throw new Error(`Invalid MCP_PROFILE: ${MCP_PROFILE}. Must match ^[a-z][a-z0-9_-]*$`);
 }
+const PROFILE = buildProfileConfig(MCP_PROFILE);
 
 const DB_PROFILE = PROFILE.schema;
 const SERVER_NAME = `${PROFILE.schema}-memory-mcp`;
@@ -135,7 +151,7 @@ function setMemorySourceWhitelist(nextSources) {
 }
 setMemorySourceWhitelist(buildMemorySourceListForMode());
 
-const PORT = Number.parseInt(process.env.PORT || String(PROFILE.defaultPort), 10);
+const PORT = Number.parseInt(process.env.PORT || '18790', 10);
 const SUPABASE_BASE_URL = process.env.SUPABASE_BASE_URL || 'http://127.0.0.1:8100';
 const OAUTH_ENABLED = process.env.MCP_OAUTH_ENABLED !== 'false';
 const REQUIRE_BEARER = process.env.MCP_REQUIRE_BEARER === 'true';
@@ -174,7 +190,7 @@ const JINA_EMBEDDING_DIMENSIONS_SAFE =
     ? JINA_EMBEDDING_DIMENSIONS
     : 1024;
 const CHUNK_VISIBILITY_WHITELIST = new Set(['private', 'shared', 'global']);
-const CHUNK_BODY_WHITELIST = new Set(['coco', 'toto', 'system']);
+const CHUNK_BODY_WHITELIST = new Set(PROFILE.recallBodyEnum);
 const COCO_MEMORY_INGEST_ORIGIN_WHITELIST = new Set([
   'perplexity-coco',
   'cursor-coco',
@@ -4191,6 +4207,7 @@ const server = http.createServer(async (req, res) => {
   if (req.method === 'GET' && (url.pathname === '/' || url.pathname === '/health')) {
     json(res, 200, {
       ok: true,
+      profile: MCP_PROFILE,
       name: SERVER_NAME,
       transport: 'streamable-http',
       endpoint: '/mcp',
