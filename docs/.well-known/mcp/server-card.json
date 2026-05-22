@@ -1,0 +1,36 @@
+{
+  "name": "MarsNMe",
+  "description": "Agent-agnostic persistent memory backend for AI. Two-tier memory (short-term + long-term), semantic search via Jina embeddings v3, multi-profile isolation, built on Supabase pgvector.",
+  "version": "0.1.6",
+  "homepage": "https://marsnme.com",
+  "repository": "https://github.com/Marsmanleo/MarsNMe",
+  "author": {
+    "name": "Mars Group",
+    "url": "https://github.com/marsmanleo"
+  },
+  "license": "Apache-2.0",
+  "categories": ["memory", "ai", "persistence", "semantic-search"],
+  "tags": ["mcp", "memory", "ai-memory", "persistent-memory", "supabase", "jina", "typescript", "model-context-protocol", "ai-agent", "semantic-search"],
+  "transport": ["http"],
+  "endpoints": {
+    "mcp": "/mcp",
+    "health": "/health"
+  },
+  "tools_count": 13,
+  "install": {
+    "npm": "npx @marsnme/mcp-gateway",
+    "package": "@marsnme/mcp-gateway"
+  },
+  "environment": {
+    "required": [
+      "MCP_PROFILE",
+      "SUPABASE_BASE_URL",
+      "SUPABASE_SERVICE_ROLE_KEY",
+      "JINA_API_KEY"
+    ],
+    "optional": [
+      "PORT",
+      "MCP_REQUIRE_BEARER"
+    ]
+  }
+}
