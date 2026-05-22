@@ -117,7 +117,7 @@ npx supabase db push --db-url "<your-supabase-db-connection-string>"
    - Use any profile name you want (for example: `default`, `my-agent`, `profile-a`).
    - Legacy built-in profile IDs `coco` and `toto` are still supported for compatibility.
 ```bash
-MCP_PROFILE=profile-a node soul-memory/server.mjs
+MCP_PROFILE=profile-a npx @marsnme/mcp-gateway
 ```
 7. Verify health:
 ```bash
@@ -140,7 +140,7 @@ docker compose up
 This starts:
 - PostgreSQL + pgvector
 - SQL migrations from `supabase/migrations/`
-- PostgREST (`http://127.0.0.1:8100`)
+- PostgREST + rest-proxy
 - MarsNMe gateway (`http://127.0.0.1:18790/mcp`)
 
 3. Verify health:
@@ -323,12 +323,12 @@ See `docs/dream-runner-self-host.md` for full configuration.
 - Cursor template: `skills/cursor/memory-daily-boot/rule.mdc`
 - Warp template: `skills/warp/memory-daily-boot/prompt.md`
 
-## Local run
+## Local run (from cloned repo)
 ```bash
-MCP_PROFILE=profile-a node soul-memory/server.mjs
+MCP_PROFILE=profile-a npx @marsnme/mcp-gateway
 ```
 ```bash
-MCP_PROFILE=profile-b node soul-memory/server.mjs
+MCP_PROFILE=profile-b npx @marsnme/mcp-gateway
 ```
 
 Health endpoints:

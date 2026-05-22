@@ -48,7 +48,7 @@ Option B (Supabase Dashboard SQL Editor):
 
 ## 4) Start the gateway
 ```bash
-MCP_PROFILE=profile-a node soul-memory/server.mjs
+MCP_PROFILE=profile-a npx @marsnme/mcp-gateway
 ```
 ## 5) Verify health endpoint
 ```bash
