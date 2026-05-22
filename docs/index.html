@@ -64,18 +64,52 @@
 /* THEME TOGGLE BUTTON */
 .theme-toggle{
   background:none;border:1px solid var(--color-border);
-  border-radius:var(--radius-sm);padding:6px 10px;
-  cursor:pointer;font-size:16px;line-height:1;
+  border-radius:var(--radius-sm);padding:6px 8px;
+  cursor:pointer;line-height:1;
   color:var(--color-text-muted);
   transition:all 150ms;
-  display:flex;align-items:center;
+  display:flex;align-items:center;justify-content:center;
+  width:32px;height:32px;flex-shrink:0;
 }
 .theme-toggle:hover{border-color:var(--color-accent);color:var(--color-accent);}
 
-/* GIF filter in light mode */
+/* GIF in light mode — white bg wrapper */
 [data-theme="light"] .hero-demo-gif{
-  filter:brightness(0.92) contrast(1.05);
-  box-shadow:0 8px 48px rgba(234,108,10,0.15);
+  filter:brightness(1) contrast(1);
+  box-shadow:0 8px 48px rgba(234,108,10,0.18);
+  background:#ffffff;
+  border-radius:12px;
+  padding:12px;
+  border:1px solid rgba(0,0,0,0.08);
+}
+
+/* Code blocks in light mode */
+[data-theme="light"] .cmd-block{
+  background:#f1f1ef;
+  border-color:rgba(0,0,0,0.10);
+}
+[data-theme="light"] .cmd-block pre{
+  color:#18181b;
+}
+[data-theme="light"] .cmd-block pre span[style*="#a78bfa"]{
+  color:#6d28d9 !important;
+}
+[data-theme="light"] .cmd-block pre span[style*="color:var(--color-text-faint)"]{
+  color:#71717a !important;
+}
+[data-theme="light"] .cmd-block pre span[style*="color:var(--color-green)"]{
+  color:#15803d !important;
+}
+[data-theme="light"] .cmd-block pre span[style*="color:var(--color-accent)"]{
+  color:#c2410c !important;
+}
+[data-theme="light"] .copy-btn{
+  color:#52525b;
+  border-color:rgba(0,0,0,0.15);
+}
+[data-theme="light"] .copy-btn:hover{
+  color:#18181b;
+  border-color:rgba(0,0,0,0.3);
 }
 
 html{scroll-behavior:smooth;-webkit-font-smoothing:antialiased;}
@@ -255,7 +289,10 @@ footer a:hover{color:var(--color-text);}
     <a href="#tools">Tools</a>
     <a href="https://github.com/Marsmanleo/MarsNMe" target="_blank" rel="noopener noreferrer">GitHub</a>
   </div>
-  <button class="theme-toggle" id="theme-toggle" aria-label="Toggle theme" title="Toggle light/dark mode">🌙</button>
+  <button class="theme-toggle" id="theme-toggle" aria-label="Toggle theme" title="Switch to light mode">
+    <svg id="icon-moon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+    <svg id="icon-sun" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+  </button>
   <a href="#install" class="nav-btn">Get Started →</a>
 </nav>
 
@@ -814,8 +851,17 @@ if(statEl) statsObserver.observe(statEl.closest('.hero-stats'));
 
   function setTheme(t){
     html.setAttribute('data-theme',t);
-    btn.textContent=t==='light'?'🌙':'☀️';
-    btn.title=t==='light'?'Switch to dark mode':'Switch to light mode';
+    var moon=document.getElementById('icon-moon');
+    var sun=document.getElementById('icon-sun');
+    if(t==='light'){
+      if(moon)moon.style.display='none';
+      if(sun)sun.style.display='block';
+      btn.title='Switch to dark mode';
+    } else {
+      if(moon)moon.style.display='block';
+      if(sun)sun.style.display='none';
+      btn.title='Switch to light mode';
+    }
     try{localStorage.setItem(STORAGE_KEY,t);}catch(e){}
   }
 
