@@ -159,23 +159,99 @@ TOTO_TOOL_CALL_JSON="$(mcp_jsonrpc "${TOTO_URL}" '{"jsonrpc":"2.0","id":"toto-li
 
 COCO_CALL_CHECK="$(CALL_PAYLOAD="${COCO_TOOL_CALL_JSON}" node -e '
 const payload = JSON.parse(process.env.CALL_PAYLOAD || "{}");
-if (payload.error) throw new Error("tools/call error: " + JSON.stringify(payload.error));
+const clip = (value, max = 800) => {
+  const text = String(value ?? "");
+  return text.length > max ? text.slice(0, max) + "...(truncated)" : text;
+};
+const extractErrorText = (value) => {
+  if (value == null) return "";
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  if (Array.isArray(value)) return value.map(extractErrorText).filter(Boolean).join(" | ");
+  if (typeof value === "object") {
+    if (typeof value.message === "string" && value.message) return value.message;
+    if (typeof value.error === "string" && value.error) return value.error;
+    if (value.error) {
+      const nested = extractErrorText(value.error);
+      if (nested) return nested;
+    }
+    if (value.details) {
+      const details = extractErrorText(value.details);
+      if (details) return details;
+    }
+    return JSON.stringify(value);
+  }
+  return String(value);
+};
+if (payload.error) throw new Error("tools/call error: " + clip(JSON.stringify(payload.error)));
 const content = payload.result?.content;
 if (!Array.isArray(content) || content.length === 0) throw new Error("tools/call missing content");
-const text = content[0]?.text ?? "";
-const parsed = JSON.parse(text);
-if (parsed.ok !== true) throw new Error("list_memories response missing ok=true");
+const textItems = content
+  .map((item) => (typeof item?.text === "string" ? item.text.trim() : ""))
+  .filter(Boolean);
+if (payload.result?.isError === true) {
+  throw new Error("tools/call returned isError=true; detail=" + clip(textItems.join(" | ")));
+}
+const firstText = textItems[0] || "";
+let parsed;
+try {
+  parsed = JSON.parse(firstText);
+} catch (err) {
+  throw new Error("tools/call first content is not valid JSON: " + clip(firstText));
+}
+if (parsed.ok !== true) {
+  const inner = extractErrorText(parsed.error) || extractErrorText(parsed.details) || extractErrorText(parsed.message) || clip(JSON.stringify(parsed));
+  throw new Error("list_memories returned ok!=true; detail=" + clip(inner));
+}
 process.stdout.write(JSON.stringify({ count: parsed.count ?? null }));
 ')"
 
 TOTO_CALL_CHECK="$(CALL_PAYLOAD="${TOTO_TOOL_CALL_JSON}" node -e '
 const payload = JSON.parse(process.env.CALL_PAYLOAD || "{}");
-if (payload.error) throw new Error("tools/call error: " + JSON.stringify(payload.error));
+const clip = (value, max = 800) => {
+  const text = String(value ?? "");
+  return text.length > max ? text.slice(0, max) + "...(truncated)" : text;
+};
+const extractErrorText = (value) => {
+  if (value == null) return "";
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  if (Array.isArray(value)) return value.map(extractErrorText).filter(Boolean).join(" | ");
+  if (typeof value === "object") {
+    if (typeof value.message === "string" && value.message) return value.message;
+    if (typeof value.error === "string" && value.error) return value.error;
+    if (value.error) {
+      const nested = extractErrorText(value.error);
+      if (nested) return nested;
+    }
+    if (value.details) {
+      const details = extractErrorText(value.details);
+      if (details) return details;
+    }
+    return JSON.stringify(value);
+  }
+  return String(value);
+};
+if (payload.error) throw new Error("tools/call error: " + clip(JSON.stringify(payload.error)));
 const content = payload.result?.content;
 if (!Array.isArray(content) || content.length === 0) throw new Error("tools/call missing content");
-const text = content[0]?.text ?? "";
-const parsed = JSON.parse(text);
-if (parsed.ok !== true) throw new Error("list_memories response missing ok=true");
+const textItems = content
+  .map((item) => (typeof item?.text === "string" ? item.text.trim() : ""))
+  .filter(Boolean);
+if (payload.result?.isError === true) {
+  throw new Error("tools/call returned isError=true; detail=" + clip(textItems.join(" | ")));
+}
+const firstText = textItems[0] || "";
+let parsed;
+try {
+  parsed = JSON.parse(firstText);
+} catch (err) {
+  throw new Error("tools/call first content is not valid JSON: " + clip(firstText));
+}
+if (parsed.ok !== true) {
+  const inner = extractErrorText(parsed.error) || extractErrorText(parsed.details) || extractErrorText(parsed.message) || clip(JSON.stringify(parsed));
+  throw new Error("list_memories returned ok!=true; detail=" + clip(inner));
+}
 process.stdout.write(JSON.stringify({ count: parsed.count ?? null }));
 ')"
 

@@ -99,6 +99,8 @@ npx supabase db push --db-url "<your-supabase-db-connection-string>"
 ```
    - Note: `--db-url` must be the Postgres database connection string from `Project Settings → Database → Connection string`.
    - It is not the same as `SUPABASE_BASE_URL` (`https://<project-ref>.supabase.co`, REST API URL).
+   - Use a role that can execute DDL on your target schemas.
+   - On Supabase-hosted Postgres this is typically `supabase_admin` (not `postgres`).
    - Option B (Supabase Dashboard SQL Editor):
      1. Open SQL Editor.
      2. Ensure the `vector` extension is enabled first (Database → Extensions).
@@ -351,15 +353,25 @@ Recommended env files:
 ```bash
 bash soul-memory/deploy/phase2/build_release_artifact.sh
 ```
-2. Dry-run deploy:
+2. Apply migrations with an explicit DDL-capable role:
 ```bash
-bash soul-memory/deploy/phase2/deploy_ct101.sh --artifact <artifact> --manifest <manifest> --profile both
+npx supabase db push --db-url "<postgres://supabase_admin:<password>@<host>:5432/postgres>"
 ```
-3. Smoke gate:
+3. Run pre-deploy schema gate (must pass before any service restart):
+```bash
+bash soul-memory/deploy/phase2/pre_deploy_schema_gate.sh \
+  --db-url "<postgres://supabase_admin:<password>@<host>:5432/postgres>" \
+  --profiles coco,toto \
+  --expected-role supabase_admin
+```
+4. Run your platform-specific rollout/restart adapter.
+   - This repository ships generic artifact + gate scripts; rollout adapters are environment-specific.
+   - If schema gate exits non-zero, stop deployment and do not restart services.
+5. Smoke gate:
 ```bash
 bash soul-memory/deploy/phase3/smoke_gate.sh --spawn-local
 ```
-4. Automated npm + MCP Registry release (tag-driven):
+6. Automated npm + MCP Registry release (tag-driven):
    - Workflow: `.github/workflows/publish-release.yml`
    - Trigger: push tag `v*`
    - Gate: tag version must match `soul-memory/package.json` version
