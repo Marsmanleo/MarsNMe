@@ -74,6 +74,32 @@ curl -sS http://127.0.0.1:18790/health
 ```
 8. Connect your MCP client (next section), then run the first round-trip check.
 
+## Try In 30 Seconds (Docker, M1)
+If you only want a local demo path, use Docker Compose.
+
+1. Set only the required key:
+```bash
+cp .env.example .env
+# fill JINA_API_KEY in .env
+```
+2. Start local stack:
+```bash
+docker compose up
+```
+This starts:
+- PostgreSQL + pgvector
+- SQL migrations from `supabase/migrations/`
+- PostgREST (`http://127.0.0.1:8100`)
+- MarsNMe gateway (`http://127.0.0.1:18790/mcp`)
+
+3. Verify health:
+```bash
+curl -sS http://127.0.0.1:18790/health
+```
+
+Cloudflare tunnel onboarding is planned in M2.  
+M1 keeps the stack local-only for safer defaults.
+
 ## MCP Client Connection Guide
 Local endpoint:
 - `http://127.0.0.1:18790/mcp`

@@ -1,6 +1,7 @@
 begin;
 
 create extension if not exists vector with schema public;
+create schema if not exists extensions;
 create extension if not exists pgcrypto with schema extensions;
 
 create schema if not exists coco;
