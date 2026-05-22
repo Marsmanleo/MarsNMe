@@ -31,6 +31,8 @@ npx supabase db push --db-url "<your-supabase-db-connection-string>"
 ```
 - Note: `--db-url` must be the Postgres database connection string from `Project Settings → Database → Connection string`.
 - It is not the same as `SUPABASE_BASE_URL` (`https://<project-ref>.supabase.co`, REST API URL).
+- Use a role that can execute DDL on your target schemas.
+- On Supabase-hosted Postgres this is typically `supabase_admin` (not `postgres`).
 
 Option B (Supabase Dashboard SQL Editor):
 1. Open SQL Editor in Supabase Dashboard.
@@ -45,6 +47,16 @@ Option B (Supabase Dashboard SQL Editor):
    - `20260517223500_usage_cost_telemetry_light.sql`
    - `20260517231000_memories_source_constraint_regex.sql`
    - `20260517232000_source_registry_table.sql`
+
+## 3.5) Pre-deploy schema compatibility gate (recommended for CI/CD upgrades)
+Run this gate before any service restart during upgrades:
+```bash
+bash soul-memory/deploy/phase2/pre_deploy_schema_gate.sh \
+  --db-url "<postgres://supabase_admin:<password>@<host>:5432/postgres>" \
+  --profiles profile-a \
+  --expected-role supabase_admin
+```
+- If this command exits non-zero, stop deployment and do not restart services.
 
 ## 4) Start the gateway
 ```bash

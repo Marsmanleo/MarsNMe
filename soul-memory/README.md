@@ -64,6 +64,22 @@ curl -sS http://127.0.0.1:18790/mcp \
   -d '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}'
 ```
 
+## Deployment safety gate (before restart)
+For upgrades, run database migrations with an explicit DDL-capable role and gate schema compatibility before restarting services.
+
+Recommended role guidance:
+- Use a role that can execute DDL on target schemas.
+- On Supabase-hosted Postgres this is typically `supabase_admin` (not `postgres`).
+
+Schema gate command:
+```bash
+bash deploy/phase2/pre_deploy_schema_gate.sh \
+  --db-url "<postgres://supabase_admin:<password>@<host>:5432/postgres>" \
+  --profiles coco,toto \
+  --expected-role supabase_admin
+```
+- If gate exits non-zero, stop deployment and do not restart services.
+
 ## Database setup and full onboarding
 For migrations and full setup details:
 - Repository README: https://github.com/Marsmanleo/MarsNMe/blob/main/README.md
