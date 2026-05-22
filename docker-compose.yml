@@ -65,5 +65,32 @@ services:
     ports:
       - "127.0.0.1:18790:18790"
 
+  marsnme-tunnel:
+    image: node:20
+    profiles: ["tunnel"]
+    working_dir: /workspace
+    depends_on:
+      rest:
+        condition: service_started
+    environment:
+      MCP_PROFILE: ${MCP_TUNNEL_PROFILE:-coco}
+      PORT: 18790
+      SUPABASE_BASE_URL: http://rest:3000
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY:-local-dev-service-role}
+      MCP_REQUIRE_BEARER: ${MCP_TUNNEL_REQUIRE_BEARER:-false}
+      JINA_API_KEY: ${JINA_API_KEY}
+    command: ["/bin/sh", "-lc", "npx -y @marsnme/mcp-gateway@0.1.4"]
+
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    profiles: ["tunnel"]
+    depends_on:
+      marsnme-tunnel:
+        condition: service_started
+    environment:
+      TARGET_URL: http://marsnme-tunnel:18790
+    command: ["tunnel", "--no-autoupdate", "--url", "http://marsnme-tunnel:18790"]
+    restart: unless-stopped
+
 volumes:
   marsnme-pgdata:

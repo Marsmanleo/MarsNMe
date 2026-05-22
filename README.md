@@ -97,8 +97,31 @@ This starts:
 curl -sS http://127.0.0.1:18790/health
 ```
 
-Cloudflare tunnel onboarding is planned in M2.  
-M1 keeps the stack local-only for safer defaults.
+## M2 Cloudflare Tunnel Profile (Demo)
+When you need a temporary public endpoint for remote AI tools:
+
+```bash
+docker compose --profile tunnel up
+```
+
+Expected output (from `tunnel` logs):
+```text
+https://xxxx.trycloudflare.com
+```
+
+Get MCP endpoint:
+```bash
+docker compose --profile tunnel logs tunnel | grep -Eo 'https://[^ ]+trycloudflare.com' | head -n1
+# append /mcp
+```
+
+Notes:
+- `trycloudflare.com` URL is temporary (demo only).
+- Local endpoint remains: `http://127.0.0.1:18790/mcp`.
+- For production/stable URL, use named tunnel (outside M2 scope).
+- Optional env:
+  - `MCP_TUNNEL_PROFILE` (default `coco`)
+  - `MCP_TUNNEL_REQUIRE_BEARER` (default `false` for demo convenience)
 
 ## MCP Client Connection Guide
 Local endpoint:
