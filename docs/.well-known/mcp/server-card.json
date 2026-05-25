@@ -1,7 +1,8 @@
 {
   "name": "MarsNMe",
+  "title": "MarsNMe — AI Persistent Memory",
   "description": "Agent-agnostic persistent memory backend for AI. Two-tier memory (short-term + long-term), semantic search via Jina embeddings v3, multi-profile isolation, built on Supabase pgvector.",
-  "version": "0.1.6",
+  "version": "0.1.8",
   "homepage": "https://marsnme.com",
   "repository": "https://github.com/Marsmanleo/MarsNMe",
   "author": {
