@@ -11,7 +11,7 @@
   },
   "license": "Apache-2.0",
   "categories": ["memory", "ai", "persistence", "semantic-search"],
-  "tags": ["mcp", "memory", "ai-memory", "persistent-memory", "supabase", "jina", "typescript", "model-context-protocol", "ai-agent", "semantic-search"],
+  "tags": ["mcp", "memory", "ai-memory", "persistent-memory", "supabase", "jina", "typescript", "model-context-protocol", "ai-agent", "semantic-search", "perplexity"],
   "transport": ["http"],
   "endpoints": {
     "mcp": "/mcp",

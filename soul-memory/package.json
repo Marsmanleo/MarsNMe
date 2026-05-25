@@ -26,7 +26,8 @@
     "session-memory",
     "cross-session",
     "llm",
-    "symbiosis"
+    "symbiosis",
+    "perplexity"
   ],
   "bin": {
     "marsnme": "server.mjs"
