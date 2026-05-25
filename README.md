@@ -87,8 +87,9 @@ Most AI memory tools help AI remember you. **MarsNMe helps you and your AI remem
    - Copy key to `JINA_API_KEY`
 
 ## Quick Start (15-20 minutes)
-This is the fastest first-run path.  
-It follows the same tools-first flow as `docs/onboarding-a-mcp-zero-to-recall.md` and `docs/onboarding-b-platform-skill-install.md`.
+For the fastest path, use the one-line installer: `curl -fsSL https://marsnme.com/install.sh | bash`
+
+The manual path below follows the same tools-first flow as `docs/onboarding-a-mcp-zero-to-recall.md` and `docs/onboarding-b-platform-skill-install.md`.
 1. Clone repository:
 ```bash
 git clone https://github.com/Marsmanleo/MarsNMe.git
