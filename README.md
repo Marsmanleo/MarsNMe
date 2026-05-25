@@ -6,6 +6,10 @@ MarsNMe is built on a symbiosis philosophy: shared memory should strengthen trus
 
 An agent-agnostic, LLM-agnostic memory backend for MCP-compatible tools.
 
+```bash
+curl -fsSL https://marsnme.com/install.sh | bash
+```
+
 [![npm version](https://img.shields.io/npm/v/@marsnme/mcp-gateway?color=%23E5484D&label=npm)](https://www.npmjs.com/package/@marsnme/mcp-gateway) [![MCP Registry](https://img.shields.io/badge/MCP_Registry-listed-%2300A67E?logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHBhdGggZmlsbD0id2hpdGUiIGQ9Ik0xMiAyQzYuNDggMiAyIDYuNDggMiAxMnM0LjQ4IDEwIDEwIDEwIDEwLTQuNDggMTAtMTNTMTcuNTIgMiAxMiAyem0tMSAxN1Y5bDQgNHY0aC00eiIvPjwvc3ZnPg==)](https://registry.modelcontextprotocol.io/v0.1/servers?search=marsnme) [![LobeHub](https://lobehub.com/badge/mcp/marsmanleo-marsnme)](https://lobehub.com/mcp/marsmanleo-marsnme) [![npm downloads](https://img.shields.io/npm/dm/@marsnme/mcp-gateway?color=%23E5484D&label=downloads)](https://www.npmjs.com/package/@marsnme/mcp-gateway) [![License](https://img.shields.io/badge/license-Apache--2.0-%23D22128)](LICENSE) [![GitHub stars](https://img.shields.io/github/stars/Marsmanleo/MarsNMe?style=social)](https://github.com/Marsmanleo/MarsNMe)
 
 <p align="center">
@@ -60,7 +64,7 @@ Most AI memory tools help AI remember you. **MarsNMe helps you and your AI remem
 
 ### When MarsNMe is the right fit
 
-- You use multiple AI assistants (Claude, Cursor, Warp, custom agents) and want **shared memory across all of them**
+- You use multiple AI assistants (Claude, Cursor, Perplexity, Warp, custom agents) and want **shared memory across all of them**
 - You want AI that remembers your projects, preferences, and decisions **across sessions** without re-explaining
 - You care about **data sovereignty** — your memories stay in your own Supabase project
 - You're building an AI agent and need a **production-ready memory backend** with semantic recall
@@ -83,8 +87,9 @@ Most AI memory tools help AI remember you. **MarsNMe helps you and your AI remem
    - Copy key to `JINA_API_KEY`
 
 ## Quick Start (15-20 minutes)
-This is the fastest first-run path.  
-It follows the same tools-first flow as `docs/onboarding-a-mcp-zero-to-recall.md` and `docs/onboarding-b-platform-skill-install.md`.
+For the fastest path, use the one-line installer: `curl -fsSL https://marsnme.com/install.sh | bash`
+
+The manual path below follows the same tools-first flow as `docs/onboarding-a-mcp-zero-to-recall.md` and `docs/onboarding-b-platform-skill-install.md`.
 1. Clone repository:
 ```bash
 git clone https://github.com/Marsmanleo/MarsNMe.git
@@ -141,6 +146,12 @@ curl -sS http://127.0.0.1:18790/health
 ## Try In 30 Seconds (Docker, M1)
 If you only want a local demo path, use Docker Compose.
 
+**One-line install (recommended):**
+```bash
+curl -fsSL https://marsnme.com/install.sh | bash
+```
+
+**Or manually:**
 1. Set only the required key:
 ```bash
 cp .env.example .env
@@ -221,6 +232,12 @@ If bearer auth is enabled (`MCP_REQUIRE_BEARER=true`), include:
 2. Add a server pointing to:
    - URL: `http://127.0.0.1:18790/mcp`
 3. Add optional bearer header if required, then reconnect.
+
+### Perplexity
+1. Open a Space in Perplexity and go to Space Settings.
+2. Under MCP servers, add:
+   - URL: `http://127.0.0.1:18790/mcp`
+3. Save and start a new conversation in that Space.
 
 ### Any MCP client (generic HTTP/SSE)
 Use a streamable HTTP/SSE MCP entry:
