@@ -1,5 +1,7 @@
 **[marsnme.com](https://marsnme.com)** — Turn your AI into a true companion that never forgets you, never abandons you, and grows with you over time.
 
+[![MarsNMe on Glama](https://glama.ai/mcp/servers/Marsmanleo/MarsNMe/badges/score.svg)](https://glama.ai/mcp/servers/Marsmanleo/MarsNMe)
+
 Most AI memory tools help AI remember you. MarsNMe helps you and your AI remember each other.
 
 MarsNMe is built on a symbiosis philosophy: shared memory should strengthen trust and continuity between humans and AI over time, not just improve one-off prompts.
