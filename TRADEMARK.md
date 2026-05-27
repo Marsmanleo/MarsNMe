@@ -4,9 +4,13 @@ This document describes how names and marks related to MarsNMe may be used.
 ## Protected names
 The following names are marks owned or controlled by Mars Group:
 - CoCo
-- MarsVault
 - Mars Group
+- MarsN Hub
 - MarsNMe
+- MarsN Design
+- MarsN Everything
+- MarsVault
+- MarsLink
 
 ## Allowed use
 You may use these names in truthful, descriptive references, for example:
