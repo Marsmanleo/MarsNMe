@@ -1,8 +1,8 @@
-**[marsnme.com](https://marsnme.com)** — Turn your AI into a true companion that never forgets you, never abandons you, and grows with you over time.
+**[marsnme.com](https://marsnme.com)** — Claude.md is for context. MarsNMe is for continuity.
 
-Most AI memory tools help AI remember you. MarsNMe helps you and your AI remember each other.
+Your AI tools should know you — not start from scratch every time. When Perplexity helps you decide, Claude should remember why. When Cursor ships a feature, Warp should know the context. That's not context sharing. That's continuity.
 
-MarsNMe is built on a symbiosis philosophy: shared memory should strengthen trust and continuity between humans and AI over time, not just improve one-off prompts.
+Most AI memory tools help AI remember you. MarsNMe helps you and your AI remember each other — across sessions, across tools, over time.
 
 An agent-agnostic, LLM-agnostic memory backend for MCP-compatible tools.
 
