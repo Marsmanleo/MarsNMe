@@ -29,6 +29,12 @@ curl -fsSL https://marsnme.com/install.sh | bash
   <img src="docs/assets/social-arch.png" alt="How MarsNMe works" width="480" />
 </p>
 
+## Real user story
+
+> I use Cursor to code, Warp to deploy, Perplexity to research, and Claude Code to manage my vault. Before MarsNMe, every tool started blank — I had to re-explain my project, my preferences, my decisions every single session. Now my AI across all four tools knows what we decided yesterday, what we tried last week, and why we chose this architecture over that one. It's not about injecting context. It's about having a relationship that compounds over time.
+>
+> — Leo, MarsNMe creator (3 months of daily use across 4 AI tools)
+
 ## Available MCP Tools (13)
 
 | Tool | Description |
