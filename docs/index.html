@@ -1021,7 +1021,7 @@ if(statEl) statsObserver.observe(statEl.closest('.hero-stats'));
 
 // Waitlist
 var LISTMONK_URL='https://listmonk.marsnme.com';
-var LISTMONK_LIST_ID=3;
+var LISTMONK_LIST_UUID='7c101cc7-8a5d-46cc-a7bb-f4f7073efe2a';
 function handleWaitlist(e){
   e.preventDefault();
   var email=document.getElementById('waitlist-email').value.trim();
@@ -1030,10 +1030,10 @@ function handleWaitlist(e){
   if(!email||!email.includes('@')){msg.textContent='Please enter a valid email.';msg.className='waitlist-msg error';return false;}
   btn.disabled=true;btn.textContent='Subscribing...';msg.textContent='';msg.className='waitlist-msg';
   if(!LISTMONK_URL){msg.textContent='You\'re on the list! We\'ll be in touch.';msg.className='waitlist-msg success';btn.textContent='Subscribed';return false;}
-  fetch(LISTMONK_URL+'/api/subscribers',{
+  fetch(LISTMONK_URL+'/api/public/subscription',{
     method:'POST',
     headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({email:email,name:'',lists:[LISTMONK_LIST_ID],status:'enabled',preconfirm_subscriptions:true})
+    body:JSON.stringify({email:email,name:'',list_uuids:[LISTMONK_LIST_UUID],preconfirm_subscriptions:true})
   }).then(function(r){
     if(!r.ok)throw new Error('Subscription failed');
     msg.textContent='You\'re on the list! We\'ll be in touch.';msg.className='waitlist-msg success';btn.textContent='Subscribed';
