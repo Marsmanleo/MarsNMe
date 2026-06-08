@@ -1,0 +1,23 @@
+name = "marsnme-local"
+main = "src/index.ts"
+compatibility_date = "2024-11-01"
+compatibility_flags = ["nodejs_compat"]
+
+# Deploy to Cloudflare button: https://deploy.workers.cloudflare.com/?url=https://github.com/Marsmanleo/MarsNMe
+
+[[d1_databases]]
+binding = "DB"
+database_name = "marsnme-local-db"
+database_id = "9e58cffe-427c-48dc-bc46-253d550cbf5d"
+
+[[vectorize]]
+binding = "VECTORIZE"
+index_name = "marsnme-local-vectors"
+dimensions = 768
+metric = "cosine"
+
+[ai]
+binding = "AI"
+
+# Multi-profile support: each profile gets its own isolated namespace
+# Profile is selected via MCP_PROFILE env var or x-mcp-profile header

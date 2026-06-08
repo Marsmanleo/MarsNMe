@@ -1,0 +1,35 @@
+{
+  "name": "@marsnme/local",
+  "version": "0.1.0",
+  "description": "MarsNMe Local — Self-hosted MCP memory server on Cloudflare Workers + D1 + Vectorize",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Marsmanleo/MarsNMe.git",
+    "directory": "marsnme-local"
+  },
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "db:create": "wrangler d1 create marsnme-local-db",
+    "db:migrate": "wrangler d1 execute marsnme-local-db --file=db/schema.sql",
+    "db:migrate:remote": "wrangler d1 execute marsnme-local-db --remote --file=db/schema.sql",
+    "vectors:create": "wrangler vectorize create marsnme-local-vectors --dimensions=768 --metric=cosine",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "agents": "^0.14.1",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20241022.0",
+    "typescript": "^5.5.0",
+    "wrangler": "^4.93.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

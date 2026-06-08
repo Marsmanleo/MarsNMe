@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MarsNMe Setup Preview</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,300..800;1,300..800&family=Inter:wght@300..700&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; }
+    :root {
+      --font-mono:'JetBrains Mono',monospace;
+      --font-body:'Inter','Helvetica Neue',sans-serif;
+      --color-bg:#0a0a0b;
+      --color-surface:#111113;
+      --color-surface-2:#18181b;
+      --color-border:rgba(255,255,255,0.10);
+      --color-text:#e4e4e7;
+      --color-text-muted:#71717a;
+      --color-accent:#f97316;
+      --color-accent-dim:rgba(249,115,22,0.14);
+      --color-green:#22c55e;
+      --color-green-dim:rgba(34,197,94,0.12);
+    }
+    html[data-theme="light"] {
+      --color-bg:#f8f8f6;
+      --color-surface:#ffffff;
+      --color-surface-2:#f1f1ef;
+      --color-border:rgba(0,0,0,0.10);
+      --color-text:#18181b;
+      --color-text-muted:#52525b;
+      --color-accent:#ea6c0a;
+      --color-accent-dim:rgba(234,108,10,0.12);
+      --color-green:#16a34a;
+      --color-green-dim:rgba(22,163,74,0.10);
+    }
+    body {
+      font-family: var(--font-body);
+      margin: 0;
+      background: radial-gradient(1200px 600px at 80% -10%, rgba(249,115,22,0.08), transparent 60%), var(--color-bg);
+      color: var(--color-text);
+      min-height: 100dvh;
+    }
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(255,255,255,0.015) 2px, rgba(255,255,255,0.015) 4px);
+      pointer-events: none;
+      z-index: 0;
+    }
+    html[data-theme="light"] body::before {
+      background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.02) 2px, rgba(0,0,0,0.02) 4px);
+    }
+    .wrap { position: relative; z-index: 1; max-width: 920px; margin: 0 auto; padding: 24px 16px 40px; }
+    .lang { display: flex; gap: 10px; margin-bottom: 12px; align-items: center; }
+    .lang-right { margin-left: auto; }
+    .theme-toggle {
+      min-width: 96px;
+      height: 34px;
+      padding: 0 10px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      line-height: 1;
+    }
+    .btn {
+      border: 1px solid var(--color-border);
+      border-radius: 8px;
+      padding: 10px 14px;
+      cursor: pointer;
+      font-weight: 600;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      letter-spacing: 0.02em;
+      transition: all 150ms;
+      background: transparent;
+      color: var(--color-text-muted);
+    }
+    .btn:hover { color: var(--color-text); border-color: rgba(249,115,22,0.45); }
+    .btn-primary { background: var(--color-accent); border-color: var(--color-accent); color: #111; }
+    .btn-primary:hover { background: #fb923c; transform: translateY(-1px); box-shadow: 0 8px 20px rgba(249,115,22,0.22); }
+    .card {
+      background: linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.00)), var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-radius: 14px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.45);
+      padding: 24px;
+    }
+    h1 { margin: 0 0 8px; font-size: 28px; color: var(--color-accent); }
+    .subtitle { color: var(--color-text-muted); font-size: 14px; margin: 0 0 20px; }
+    .mode-tabs { display: flex; gap: 8px; margin: 16px 0; }
+    .mode-tab {
+      flex: 1;
+      padding: 12px;
+      border: 1px solid var(--color-border);
+      border-radius: 8px;
+      background: var(--color-surface-2);
+      color: var(--color-text-muted);
+      text-align: center;
+      cursor: pointer;
+      font-family: var(--font-mono);
+      font-size: 12px;
+    }
+    .mode-tab.active {
+      border-color: rgba(249,115,22,0.55);
+      background: var(--color-accent-dim);
+      color: var(--color-text);
+    }
+    .stepper { display: flex; gap: 8px; margin: 16px 0; }
+    .step {
+      flex: 1;
+      padding: 10px;
+      border: 1px solid var(--color-border);
+      border-radius: 8px;
+      background: var(--color-surface-2);
+      color: var(--color-text-muted);
+      font-size: 12px;
+      text-align: center;
+      font-family: var(--font-mono);
+    }
+    .step.active { border-color: rgba(249,115,22,0.55); background: var(--color-accent-dim); color: var(--color-text); }
+    .step.done { border-color: rgba(34,197,94,0.4); background: var(--color-green-dim); color: #99f6b5; }
+    .panel { display: none; }
+    .panel.active { display: block; }
+    .label { display: block; font-size: 13px; font-weight: 600; margin: 14px 0 6px; color: #a1a1aa; font-family: var(--font-mono); }
+    .input {
+      width: 100%;
+      padding: 10px 12px;
+      background: rgba(255,255,255,0.02);
+      border: 1px solid var(--color-border);
+      border-radius: 8px;
+      color: var(--color-text);
+      font-size: 14px;
+      font-family: var(--font-body);
+    }
+    .input::placeholder { color: #52525b; }
+    .muted { color: var(--color-text-muted); font-size: 13px; margin: 6px 0 0; }
+    .actions { display: flex; gap: 10px; margin-top: 20px; }
+    .deploy-steps {
+      background: var(--color-surface-2);
+      border: 1px solid var(--color-border);
+      border-radius: 10px;
+      padding: 16px;
+      margin-bottom: 16px;
+    }
+    .deploy-steps ol { margin: 0; padding-left: 20px; color: var(--color-text-muted); font-size: 13px; line-height: 1.7; }
+    .deploy-steps li { margin-bottom: 6px; }
+    .deploy-steps code {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      background: rgba(255,255,255,0.05);
+      padding: 2px 6px;
+      border-radius: 4px;
+      color: var(--color-accent);
+    }
+    .error { color: #ef4444; font-size: 13px; margin-top: 8px; min-height: 18px; }
+    .success {
+      display: none;
+      background: var(--color-green-dim);
+      border: 1px solid rgba(34,197,94,0.3);
+      border-radius: 10px;
+      padding: 16px;
+      margin-top: 16px;
+    }
+    .mcp-url { font-family: var(--font-mono); font-size: 16px; color: var(--color-accent); word-break: break-all; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="lang">
+      <button class="btn" id="btn-zh" onclick="setLang('zh')">繁體中文</button>
+      <button class="btn" id="btn-en" onclick="setLang('en')">English</button>
+      <div class="lang-right">
+        <button class="btn theme-toggle" onclick="toggleTheme()">
+          <span id="theme-icon">☀️</span>
+          <span id="theme-label">Light</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h1>MarsNMe Setup</h1>
+      <p class="subtitle" id="subtitle">Choose your database backend and complete the setup.</p>
+
+      <div class="mode-tabs">
+        <button class="mode-tab active" id="tab-supabase" onclick="switchMode('supabase')">Supabase</button>
+        <button class="mode-tab" id="tab-d1" onclick="switchMode('d1')">Cloudflare D1 (Self-Hosted)</button>
+      </div>
+
+      <!-- Supabase Mode -->
+      <div id="panel-supabase" class="panel active">
+        <div class="stepper" id="stepper-supabase">
+          <div class="step active"><strong>1/4</strong><br>Basics</div>
+          <div class="step"><strong>2/4</strong><br>Connect Supabase</div>
+          <div class="step"><strong>3/4</strong><br>Preferences</div>
+          <div class="step"><strong>4/4</strong><br>Review & Create</div>
+        </div>
+
+        <label class="label">Username (lowercase letters + numbers)</label>
+        <input class="input" type="text" placeholder="leo123" value="leo" />
+
+        <label class="label">Setup type</label>
+        <select class="input">
+          <option>Solo</option>
+          <option>Team</option>
+          <option>Migration</option>
+        </select>
+
+        <div class="actions">
+          <button class="btn">Back</button>
+          <button class="btn btn-primary">Next</button>
+        </div>
+      </div>
+
+      <!-- D1 Self-Hosted Mode -->
+      <div id="panel-d1" class="panel">
+        <div class="stepper" id="stepper-d1">
+          <div class="step done"><strong>1/2</strong><br>Account</div>
+          <div class="step active"><strong>2/2</strong><br>Worker URL</div>
+        </div>
+
+        <div class="deploy-steps">
+          <ol>
+            <li>Deploy MarsNMe Local to your Cloudflare account</li>
+            <li>Copy your worker URL (e.g. <code>https://marsnme-local.your-name.workers.dev</code>)</li>
+            <li>Paste it below to complete registration</li>
+          </ol>
+        </div>
+
+        <label class="label">D1 Worker URL</label>
+        <input class="input" type="text" placeholder="https://your-worker.your-account.workers.dev" />
+        <p class="muted">URL should look like: https://marsnme-local.your-name.workers.dev</p>
+
+        <div class="actions">
+          <button class="btn">Back</button>
+          <button class="btn btn-primary">Create MCP URL</button>
+        </div>
+      </div>
+
+      <div class="error" id="error"></div>
+    </div>
+  </div>
+
+  <script>
+    let mode = 'supabase';
+    let lang = 'en';
+
+    const i18n = {
+      en: {
+        subtitle: "Choose your database backend and complete the setup.",
+        themeLight: "Light",
+        themeDark: "Dark",
+      },
+      zh: {
+        subtitle: "選擇數據庫後端並完成設定。",
+        themeLight: "淺色",
+        themeDark: "深色",
+      }
+    };
+
+    function byId(id) { return document.getElementById(id); }
+
+    function switchMode(newMode) {
+      mode = newMode;
+      byId('tab-supabase').classList.toggle('active', mode === 'supabase');
+      byId('tab-d1').classList.toggle('active', mode === 'd1');
+      byId('panel-supabase').classList.toggle('active', mode === 'supabase');
+      byId('panel-d1').classList.toggle('active', mode === 'd1');
+    }
+
+    function toggleTheme() {
+      const html = document.documentElement;
+      const current = html.getAttribute('data-theme');
+      const next = current === 'dark' ? 'light' : 'dark';
+      html.setAttribute('data-theme', next);
+      byId('theme-icon').textContent = next === 'dark' ? '☀️' : '🌙';
+      byId('theme-label').textContent = i18n[lang][next === 'dark' ? 'themeLight' : 'themeDark'];
+    }
+
+    function setLang(newLang) {
+      lang = newLang;
+      byId('subtitle').textContent = i18n[lang].subtitle;
+      const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+      byId('theme-label').textContent = i18n[lang][isDark ? 'themeLight' : 'themeDark'];
+    }
+  </script>
+</body>
+</html>

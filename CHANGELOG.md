@@ -7,6 +7,21 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added
+- **Cloudflare Routing Worker** (`soul-memory/cloudflare-routing-worker/`): username-based MCP reverse proxy
+  - Setup wizard page at `/setup` with bilingual UI (EN + 繁體中文), dark/light theme, autosave
+  - Registration API at `/api/register` for Supabase and D1 (self-hosted) modes
+  - AES-GCM encryption for stored secrets (anon keys, bearer tokens)
+  - IP-based rate limiting (5 registrations/hour)
+  - CSP headers, private upstream blocking, username validation
+  - Full test suite with vitest (15 test cases)
+  - Deployment scripts, KV management tools, smoke tests
+- **MarsNMe Local** (`marsnme-local/`): self-hosted MCP memory server on Cloudflare Workers + D1 + Vectorize
+  - No external dependencies beyond user's own Cloudflare account
+  - Tools: `insert_memory`, `list_memories`, `search_memories`, `soft_forget`, `memory_ingest`, `recall`, `demote_memory`, `explain_memory`, `session_boot`, `session_close`, `health_check`
+  - D1 schema with memories, insights, entities, relations, observations tables
+  - Workers AI embeddings (bge-base-en-v1.5, 768 dimensions) with Vectorize
+
 ## [0.1.7] - upcoming
 ### Changed
 - Expanded npm keywords to 15 terms for better discoverability (`session-memory`, `cross-session`, `llm`, `symbiosis`, and more)
