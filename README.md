@@ -80,6 +80,15 @@ Most AI memory tools help AI remember you. **MarsNMe helps you and your AI remem
 - You only need single-session context (just use the system prompt)
 - You want fully managed, zero-config memory with no setup (try a hosted solution)
 
+## Repository Packages
+
+| Package | Description |
+|---|---|
+| `soul-memory/` | Core MCP gateway — agent-agnostic memory backend (this package is published to npm as `@marsnme/mcp-gateway`) |
+| `soul-memory/cloudflare-routing-worker/` | Cloudflare Worker for `mcp.marsnme.com` — username-based MCP routing proxy with setup wizard |
+| `marsnme-local/` | Self-hosted MCP memory server on Cloudflare Workers + D1 + Vectorize (no Supabase needed) |
+| `lingua-mcp/` | Daily language practice MCP server — curriculum, progress tracking, mastery scoring |
+
 ## Before You Start (External Dependencies)
 1. Create a Supabase project (free plan is enough):
    - Sign up: https://supabase.com
