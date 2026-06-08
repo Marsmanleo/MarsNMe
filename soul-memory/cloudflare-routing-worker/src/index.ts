@@ -424,6 +424,7 @@ function setupHtml(host: string): string {
 <body>
   <div class="wrap">
     <div class="lang">
+      <a href="https://marsnme.com" style="font-family:var(--font-mono);font-size:12px;font-weight:700;color:var(--color-accent);text-decoration:none;display:inline-flex;align-items:center;gap:4px;">← MarsNMe</a>
       <button id="zh" class="btn btn-ghost">繁體中文</button>
       <button id="en" class="btn btn-ghost">English</button>
       <div class="lang-right">
