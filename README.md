@@ -88,6 +88,21 @@ Most AI memory tools help AI remember you. **MarsNMe helps you and your AI remem
 | `soul-memory/cloudflare-routing-worker/` | Cloudflare Worker for `mcp.marsnme.com` — username-based MCP routing proxy with setup wizard |
 | `marsnme-local/` | Self-hosted MCP memory server on Cloudflare Workers + D1 + Vectorize (no Supabase needed) |
 
+## Quick Setup (no install needed)
+
+Go to **[mcp.marsnme.com/setup](https://mcp.marsnme.com/setup)** — create your personal MCP URL in 4 steps:
+
+1. Pick a username
+2. Enter your Supabase credentials (URL + anon key)
+3. Choose preferences
+4. Get your MCP URL: `https://mcp.marsnme.com/your-name`
+
+Then add it to any MCP client (Claude, Cursor, Perplexity, Warp).
+
+**Self-hosted?** Deploy [`marsnme-local/`](marsnme-local/) to your own Cloudflare account — no Supabase needed, uses D1 + Workers AI + Vectorize.
+
+---
+
 ## Before You Start (External Dependencies)
 1. Create a Supabase project (free plan is enough):
    - Sign up: https://supabase.com
