@@ -453,6 +453,13 @@ footer a:hover{color:var(--color-text);}
             <p>All migrations live in <code style="font-family:var(--font-mono);color:var(--color-text-muted);font-size:0.9em;">supabase/migrations/</code>. Reproducible deployments, version-controlled memory schema.</p>
           </div>
         </div>
+        <div class="how-step">
+          <span class="step-num">05</span>
+          <div class="step-content">
+            <h3>Cloud Hosted or Self-Hosted</h3>
+            <p>Use <code style="font-family:var(--font-mono);color:var(--color-accent);font-size:0.9em;">mcp.marsnme.com/your-name</code> for zero-config cloud routing, or deploy <code style="font-family:var(--font-mono);color:var(--color-accent);font-size:0.9em;">marsnme-local</code> to your own Cloudflare account for full self-hosting with D1 + Vectorize.</p>
+          </div>
+        </div>
       </div>
       <div class="terminal reveal">
         <div class="terminal-bar">
@@ -606,6 +613,7 @@ footer a:hover{color:var(--color-text);}
             <button class="profile-tab" onclick="switchTab('claude')">Claude Desktop</button>
             <button class="profile-tab" onclick="switchTab('warp')">Warp</button>
             <button class="profile-tab" onclick="switchTab('manual')">Manual</button>
+            <button class="profile-tab" onclick="switchTab('selfhost')">Self-Hosted</button>
           </div>
 
           <div id="tab-docker" style="display:none">
@@ -707,6 +715,30 @@ URL: http://127.0.0.1:18790/mcp</span></pre>
             </div>
             <div class="install-note">
               Requires: <span style="color:var(--color-text-muted)">Node.js 20+</span> · <span style="color:var(--color-text-muted)">Supabase project</span> · <span style="color:var(--color-text-muted)">JINA_API_KEY</span>
+            </div>
+          </div>
+
+          <div id="tab-selfhost" style="display:none">
+            <div class="cmd-block">
+              <button class="copy-btn" onclick="copyCode(this,'selfhost-cloud')">copy</button>
+              <pre id="selfhost-cloud"><span class="code-comment"># Option A: Cloud hosted (zero config)</span>
+<span style="color:var(--color-accent)">$</span> <span style="color:var(--color-text)">open https://marsnme.com/setup</span>
+<span style="color:var(--color-text-faint)"># → Create your MCP URL in 4 steps</span>
+<span style="color:var(--color-text-faint)"># → Get: https://mcp.marsnme.com/your-name</span>
+
+<span class="code-comment"># Option B: Self-hosted on Cloudflare (full control)</span>
+<span style="color:var(--color-accent)">$</span> <span style="color:var(--color-text)">cd marsnme-local</span>
+<span style="color:var(--color-accent)">$</span> <span style="color:var(--color-text)">npm install</span>
+<span style="color:var(--color-accent)">$</span> <span style="color:var(--color-text)">wrangler d1 create marsnme-local-db</span>
+<span style="color:var(--color-accent)">$</span> <span style="color:var(--color-text)">wrangler d1 execute marsnme-local-db --file=db/schema.sql</span>
+<span style="color:var(--color-accent)">$</span> <span style="color:var(--color-text)">wrangler vectorize create marsnme-local-vectors --dimensions=768 --metric=cosine</span>
+<span style="color:var(--color-accent)">$</span> <span style="color:var(--text)">wrangler deploy</span>
+<span style="color:var(--color-green)"># your MCP endpoint: https://marsnme-local.your-name.workers.dev</span></pre>
+            </div>
+            <div class="install-note">
+              <strong>Cloud hosted:</strong> No infrastructure needed. Supabase + our routing worker handles everything.<br>
+              <strong>Self-hosted:</strong> Your own Cloudflare account. No Supabase needed — uses D1 + Workers AI + Vectorize.<br>
+              Both paths expose the same <span style="color:var(--color-text-muted)">13 MCP tools</span>.
             </div>
           </div>
         </div>
