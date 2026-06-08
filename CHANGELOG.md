@@ -21,10 +21,6 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   - Tools: `insert_memory`, `list_memories`, `search_memories`, `soft_forget`, `memory_ingest`, `recall`, `demote_memory`, `explain_memory`, `session_boot`, `session_close`, `health_check`
   - D1 schema with memories, insights, entities, relations, observations tables
   - Workers AI embeddings (bge-base-en-v1.5, 768 dimensions) with Vectorize
-- **LinguaMCP** (`lingua-mcp/`): daily language practice MCP server
-  - Tools: `get_today_lesson`, `get_user_progress`, `log_response`
-  - Supabase-backed curriculum with skill books, chapters, lessons
-  - Auto-creates daily sessions, tracks mastery progression
 
 ## [0.1.7] - upcoming
 ### Changed
