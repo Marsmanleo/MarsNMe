@@ -767,7 +767,7 @@ function setupHtml(host: string): string {
     function showStep() {
       if (mode === "d1") {
         byId("step-d1").classList.toggle("hidden", step !== 2);
-        steps.forEach((n) => byId("step-" + n).classList.add("hidden"));
+        steps.forEach((n) => byId("step-" + n).classList.toggle("hidden", n !== step));
       } else {
         byId("step-d1").classList.add("hidden");
         steps.forEach((n) => byId("step-" + n).classList.toggle("hidden", n !== step));
