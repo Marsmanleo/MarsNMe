@@ -1,4 +1,4 @@
-**English** | [繁體中文（台灣）](docs/README.zh-TW.md) | [繁體中文（香港）](docs/README.zh-HK.md)
+**English** | [繁體中文（台灣）](docs/README.zh-TW.md) | [繁體中文（香港）](docs/README.zh-HK.md) | [简体中文](docs/README.zh-CN.md)
 
 ---
 
