@@ -1,3 +1,7 @@
+**English** | [繁體中文（台灣）](docs/README.zh-TW.md) | [繁體中文（香港）](docs/README.zh-HK.md)
+
+---
+
 **[marsnme.com](https://marsnme.com)** — Claude.md is for context. MarsNMe is for continuity.
 
 Your AI tools should know you — not start from scratch every time. When Perplexity helps you decide, Claude should remember why. When Cursor ships a feature, Warp should know the context. That's not context sharing. That's continuity.
