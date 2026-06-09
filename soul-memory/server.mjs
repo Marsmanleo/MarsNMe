@@ -2,6 +2,7 @@
 import http from 'node:http';
 import crypto from 'node:crypto';
 import { execFileSync } from 'node:child_process';
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 
@@ -171,6 +172,28 @@ if (!Number.isInteger(PORT) || PORT < 1 || PORT > 65535) {
   throw new Error(`Invalid PORT: ${PORT_RAW || String(PORT)}. Must be an integer between 1 and 65535.`);
 }
 const SUPABASE_BASE_URL = process.env.SUPABASE_BASE_URL || 'http://127.0.0.1:8100';
+const SUPABASE_AUTH_MODE_VALUES = new Set(['service', 'anon', 'hybrid']);
+const SUPABASE_AUTH_MODE_RAW = String(process.env.MCP_SUPABASE_AUTH_MODE || 'service')
+  .trim()
+  .toLowerCase();
+if (SUPABASE_AUTH_MODE_RAW && !SUPABASE_AUTH_MODE_VALUES.has(SUPABASE_AUTH_MODE_RAW)) {
+  console.warn(
+    `[config] invalid MCP_SUPABASE_AUTH_MODE=${SUPABASE_AUTH_MODE_RAW}; fallback to service`
+  );
+}
+const SUPABASE_AUTH_MODE = SUPABASE_AUTH_MODE_VALUES.has(SUPABASE_AUTH_MODE_RAW)
+  ? SUPABASE_AUTH_MODE_RAW
+  : 'service';
+const SUPABASE_ANON_KEY = String(process.env.SUPABASE_ANON_KEY || '').trim();
+const ANON_ALLOWED_TOOL_NAMES = new Set([
+  'list_memories',
+  'search_memories',
+  'reload_source_registry',
+  'recall',
+  'health_check',
+  'explain_memory'
+]);
+const SUPABASE_REQUEST_CONTEXT = new AsyncLocalStorage();
 const OAUTH_ENABLED = process.env.MCP_OAUTH_ENABLED !== 'false';
 const REQUIRE_BEARER = process.env.MCP_REQUIRE_BEARER === 'true';
 const BYPASS_BEARER_FOR_PRIVATE = process.env.MCP_BYPASS_BEARER_FOR_PRIVATE !== 'false';
@@ -711,11 +734,52 @@ function buildTools() {
         required: ['id'],
         additionalProperties: false
       }
+    },
+    {
+      name: 'batch_promote',
+      description: `Auto-promote expiring short memories to long-term ${DB_PROFILE}.marsvault_chunks. Finds candidates via health check scoring, ingests content, marks promoted.`,
+      inputSchema: {
+        type: 'object',
+        properties: {
+          alert_window_hours: {
+            type: 'number',
+            minimum: 1,
+            maximum: 720,
+            default: 48,
+            description: 'Look-ahead window for expiring memories (hours)'
+          },
+          max_promote: {
+            type: 'number',
+            minimum: 1,
+            maximum: 50,
+            default: 10,
+            description: 'Maximum memories to promote in one batch'
+          },
+          dry_run: {
+            type: 'boolean',
+            default: false,
+            description: 'If true, list candidates without promoting'
+          },
+          memory_ids: {
+            type: 'array',
+            items: { type: 'string' },
+            maxItems: 50,
+            description: 'Optional explicit memory IDs to promote (skips auto-detection)'
+          },
+          origin: {
+            type: 'string',
+            description: 'Origin marker for promoted chunks',
+            default: 'batch-promote'
+          }
+        },
+        additionalProperties: false
+      }
     }
   ];
 }
 
 const TOOLS = buildTools();
+const TOOL_BY_NAME = new Map(TOOLS.map((tool) => [tool.name, tool]));
 
 const OAUTH_CLIENTS = new Map();
 const OAUTH_CODES = new Map();
@@ -876,7 +940,15 @@ function getServiceKey() {
   );
 }
 
-const SERVICE_KEY = getServiceKey();
+const SERVICE_KEY = SUPABASE_AUTH_MODE === 'anon' ? '' : getServiceKey();
+if (
+  (SUPABASE_AUTH_MODE === 'anon' || SUPABASE_AUTH_MODE === 'hybrid') &&
+  !SUPABASE_ANON_KEY
+) {
+  throw new Error(
+    'SUPABASE_ANON_KEY is required when MCP_SUPABASE_AUTH_MODE is anon or hybrid'
+  );
+}
 loadPersistedOauthClients();
 
 if (STATIC_CLIENT_ID && STATIC_CLIENT_SECRET && OAUTH_ENABLED) {
@@ -935,10 +1007,67 @@ async function readRequestBody(req) {
   }
 }
 
+function resolveSupabaseRequestAuthMode() {
+  const storeMode = String(SUPABASE_REQUEST_CONTEXT.getStore()?.db_auth_mode || '')
+    .trim()
+    .toLowerCase();
+  if (SUPABASE_AUTH_MODE_VALUES.has(storeMode)) {
+    return storeMode;
+  }
+  if (SUPABASE_AUTH_MODE === 'anon') {
+    return 'anon';
+  }
+  return 'service';
+}
+
+function isToolAllowedInAnonMode(toolName) {
+  return ANON_ALLOWED_TOOL_NAMES.has(String(toolName || '').trim());
+}
+
+function assertToolCapabilityForAuthMode(toolName) {
+  if (SUPABASE_AUTH_MODE !== 'anon') return;
+  if (isToolAllowedInAnonMode(toolName)) return;
+  throw new Error(
+    `capability_not_available_in_anon_mode: ${toolName} is disabled; use MCP_SUPABASE_AUTH_MODE=service or hybrid`
+  );
+}
+
+function resolveDbAuthModeForTool(toolName) {
+  if (SUPABASE_AUTH_MODE === 'anon') return 'anon';
+  if (SUPABASE_AUTH_MODE === 'service') return 'service';
+  return isToolAllowedInAnonMode(toolName) ? 'anon' : 'service';
+}
+function listAvailableToolNamesForAuthMode(authMode) {
+  if (authMode === 'anon') {
+    return TOOLS
+      .map((tool) => String(tool?.name || '').trim())
+      .filter((name) => name && isToolAllowedInAnonMode(name));
+  }
+  return TOOLS.map((tool) => String(tool?.name || '').trim()).filter(Boolean);
+}
+function listAvailableToolsForAuthMode(authMode) {
+  const names = listAvailableToolNamesForAuthMode(authMode);
+  return names
+    .map((name) => TOOL_BY_NAME.get(name))
+    .filter((tool) => Boolean(tool));
+}
+function buildSupabaseCapabilityPayload() {
+  return {
+    mode: SUPABASE_AUTH_MODE,
+    anon_allowed_tools: listAvailableToolNamesForAuthMode('anon'),
+    effective_tools: listAvailableToolNamesForAuthMode(SUPABASE_AUTH_MODE)
+  };
+}
+
 async function supabaseRequest(path, options = {}) {
+  const requestAuthMode = resolveSupabaseRequestAuthMode();
+  const requestApiKey = requestAuthMode === 'anon' ? SUPABASE_ANON_KEY : SERVICE_KEY;
+  if (!requestApiKey) {
+    throw new Error(`Supabase API key missing for auth mode: ${requestAuthMode}`);
+  }
   const headers = {
-    apikey: SERVICE_KEY,
-    Authorization: `Bearer ${SERVICE_KEY}`,
+    apikey: requestApiKey,
+    Authorization: `Bearer ${requestApiKey}`,
     'content-type': 'application/json'
   };
   if (options.profile) {
@@ -1455,7 +1584,10 @@ async function writeToolUsageTelemetry(payload = {}) {
     new Date().toISOString();
   const agentBody =
     normalizeOptionalAgentBody(payload.agent_body) || DB_PROFILE;
-  try {
+  if (SUPABASE_AUTH_MODE === 'anon') {
+    return;
+  }
+  const writeTelemetry = async () => {
     await supabaseRequest(
       `/rest/v1/memory_tool_usage?select=${TOOL_USAGE_INSERT_SELECT_COLUMNS}`,
       {
@@ -1473,6 +1605,13 @@ async function writeToolUsageTelemetry(payload = {}) {
         ]
       }
     );
+  };
+  try {
+    if (SUPABASE_AUTH_MODE === 'hybrid') {
+      await SUPABASE_REQUEST_CONTEXT.run({ db_auth_mode: 'service' }, writeTelemetry);
+    } else {
+      await writeTelemetry();
+    }
   } catch (error) {
     console.warn(
       `[telemetry] failed to persist memory_tool_usage: ${String(error?.message || error)}`
@@ -2717,6 +2856,156 @@ async function runHealthExpiryCheck(args = {}) {
   return payload;
 }
 
+async function runBatchPromote(args = {}) {
+  const alertWindowHours = clampInteger(args.alert_window_hours, 1, 720, 48);
+  const maxPromote = clampInteger(args.max_promote, 1, 50, 10);
+  const dryRun = Boolean(args.dry_run);
+  const origin = String(args.origin || 'batch-promote').trim() || 'batch-promote';
+  const explicitIds = Array.isArray(args.memory_ids)
+    ? args.memory_ids
+        .map((id) => normalizeOptionalUuid(id, 'memory_ids'))
+        .filter(Boolean)
+    : [];
+
+  const candidates = [];
+
+  if (explicitIds.length > 0) {
+    for (const memoryId of explicitIds.slice(0, maxPromote)) {
+      const memory = await fetchMemoryById(memoryId);
+      if (!memory) {
+        candidates.push({ id: memoryId, status: 'not_found', skipped: true });
+        continue;
+      }
+      if (memory.promoted || memory.promoted_at) {
+        candidates.push({
+          id: memoryId,
+          status: 'already_promoted',
+          skipped: true,
+          excerpt: String(memory.body || '').slice(0, 140)
+        });
+        continue;
+      }
+      candidates.push({
+        id: memoryId,
+        status: 'eligible',
+        skipped: false,
+        excerpt: String(memory.body || '').slice(0, 140),
+        tags: normalizeTags(memory.tags),
+        expires_at: memory.expires_at || null,
+        memory
+      });
+    }
+  } else {
+    const healthResult = await runHealthExpiryCheck({
+      alert_window_hours: alertWindowHours
+    });
+    const soonExpiring = healthResult?.expiry_alert?.soon_expiring || [];
+    const recommended = soonExpiring
+      .filter((item) => item.recommend_promote === 'Y')
+      .slice(0, maxPromote);
+
+    for (const item of recommended) {
+      const memory = await fetchMemoryById(item.id);
+      if (!memory) {
+        candidates.push({ id: item.id, status: 'not_found', skipped: true });
+        continue;
+      }
+      candidates.push({
+        id: item.id,
+        status: 'eligible',
+        skipped: false,
+        excerpt: item.excerpt || String(memory.body || '').slice(0, 140),
+        tags: item.tags || normalizeTags(memory.tags),
+        expires_at: item.expires_at || memory.expires_at || null,
+        recommendation_reason: item.recommendation_reason || null,
+        memory
+      });
+    }
+  }
+
+  const eligible = candidates.filter((c) => !c.skipped);
+
+  if (dryRun) {
+    return {
+      ok: true,
+      dry_run: true,
+      profile: DB_PROFILE,
+      origin,
+      alert_window_hours: alertWindowHours,
+      max_promote: maxPromote,
+      total_candidates: candidates.length,
+      eligible_count: eligible.length,
+      skipped_count: candidates.length - eligible.length,
+      candidates: candidates.map(({ memory, ...rest }) => rest)
+    };
+  }
+
+  const promoted = [];
+  const errors = [];
+
+  for (const candidate of eligible) {
+    try {
+      const memory = candidate.memory;
+      const content = String(memory.body || '').trim();
+      if (!content) {
+        errors.push({ id: candidate.id, error: 'empty memory body' });
+        continue;
+      }
+
+      const ingestResult = await ingestMarsvaultChunks(
+        {
+          content,
+          tags: normalizeTags(memory.tags),
+          source_memory_id: memory.id,
+          source_session_id: memory.session_id || null,
+          source_tool: memory.source || null,
+          origin
+        },
+        {
+          defaultType: 'insight',
+          defaultSourceFile: PROFILE.memoryIngestDefaultSourceFile,
+          defaultSectionPrefix: 'batch-promote',
+          defaultOrigin: origin,
+          body: DB_PROFILE,
+          fixedTags: [...PROFILE.memoryIngestFixedTags, 'batch-promote']
+        }
+      );
+
+      const promotedMemory = await markMemoryAsPromoted(memory.id);
+
+      promoted.push({
+        id: memory.id,
+        chunk_count: ingestResult.chunk_count || 0,
+        promoted_at: promotedMemory?.promoted_at || null,
+        excerpt: String(content).slice(0, 140)
+      });
+    } catch (error) {
+      errors.push({
+        id: candidate.id,
+        error: normalizeOptionalText(error?.message || String(error), 280)
+      });
+    }
+  }
+
+  return {
+    ok: true,
+    dry_run: false,
+    profile: DB_PROFILE,
+    origin,
+    alert_window_hours: alertWindowHours,
+    max_promote: maxPromote,
+    total_candidates: candidates.length,
+    promoted_count: promoted.length,
+    error_count: errors.length,
+    skipped_count: candidates.length - eligible.length,
+    promoted,
+    errors: errors.length > 0 ? errors : undefined,
+    skipped: candidates
+      .filter((c) => c.skipped)
+      .map(({ memory, ...rest }) => rest)
+  };
+}
+
 async function runHealthCheck(args = {}) {
   const alertWindowHours = clampInteger(args.alert_window_hours, 1, 720, 48);
   const gapDays = clampInteger(args.gap_days, 7, 365, 30);
@@ -3620,6 +3909,9 @@ async function callTool(name, args = {}) {
       };
     }
 
+    if (toolName === 'batch_promote') {
+      return await runBatchPromote(args);
+    }
     if (toolName === 'health_check') {
       return await runHealthCheck(args);
     }
@@ -4237,6 +4529,8 @@ const server = http.createServer(async (req, res) => {
       embedding_provider: 'jina',
       embedding_model: JINA_EMBEDDING_MODEL,
       embedding_enabled: Boolean(JINA_API_KEY),
+      supabase_auth_mode: SUPABASE_AUTH_MODE,
+      supabase_capabilities: buildSupabaseCapabilityPayload(),
       source_mode: SOURCE_MODE,
       memory_sources: MEMORY_SOURCE_LIST.slice(),
       extra_sources: EXTRA_SOURCE_LIST.slice(),
@@ -4318,14 +4612,24 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (method === 'tools/list') {
-      json(res, 200, mcpResult(id, { tools: TOOLS }));
+      json(
+        res,
+        200,
+        mcpResult(id, { tools: listAvailableToolsForAuthMode(SUPABASE_AUTH_MODE) })
+      );
       return;
     }
 
     if (method === 'tools/call') {
-      const toolName = rpc?.params?.name;
+      const requestedToolName = rpc?.params?.name;
+      const toolName = resolveToolName(requestedToolName);
+      assertToolCapabilityForAuthMode(toolName);
+      const dbAuthMode = resolveDbAuthModeForTool(toolName);
       const args = rpc?.params?.arguments ?? {};
-      const result = await callTool(toolName, args);
+      const result = await SUPABASE_REQUEST_CONTEXT.run(
+        { db_auth_mode: dbAuthMode },
+        async () => await callTool(toolName, args)
+      );
       json(
         res,
         200,
