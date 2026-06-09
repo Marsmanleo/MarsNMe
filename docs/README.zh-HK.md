@@ -1,4 +1,4 @@
-[English](../README.md) | [繁體中文（台灣）](README.zh-TW.md) | **繁體中文（香港）**
+[English](../README.md) | [繁體中文（台灣）](README.zh-TW.md) | **繁體中文（香港）** | [简体中文](README.zh-CN.md)
 
 ---
 
