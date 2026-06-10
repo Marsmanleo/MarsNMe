@@ -307,7 +307,7 @@ function buildTools() {
   return [
     {
       name: 'insert_memory',
-      description: `Store a short-term memory (ephemeral context that auto-expires). Use this to capture observations, decisions, session notes, or any context worth remembering temporarily. Memories last 7 days by default unless expires_at is set. For permanent knowledge, use memory_ingest instead.`,
+      description: `Store a short-term ${PROFILE.displayName} memory into ${DB_PROFILE}.memories (ephemeral context that auto-expires). Use this to capture observations, decisions, session notes, or any context worth remembering temporarily. Memories last 7 days by default unless expires_at is set. For permanent knowledge, use memory_ingest instead.`,
       inputSchema: {
         type: 'object',
         properties: {
@@ -338,7 +338,7 @@ function buildTools() {
     },
     {
       name: 'list_memories',
-      description: `List recent short-term memories in reverse chronological order. Use this to review what was recently captured, check for duplicate memories before inserting, or browse recent activity. Returns memory body, source, creation time, and expiration status.`,
+      description: `List recent short-term memories from ${DB_PROFILE}.memories in reverse chronological order. Use this to review what was recently captured, check for duplicate memories before inserting, or browse recent activity. Returns memory body, source, creation time, and expiration status.`,
       inputSchema: {
         type: 'object',
         properties: {
@@ -351,7 +351,7 @@ function buildTools() {
     },
     {
       name: 'search_memories',
-      description: `Semantic search across short-term memories. Finds memories by meaning, not just keywords — ask a natural language question and get the most relevant matches. Use this to recall past decisions, find related context, or check if something was already discussed recently.`,
+      description: `Semantic search across short-term memories in ${DB_PROFILE}.memories using Jina embeddings. Finds memories by meaning, not just keywords — ask a natural language question and get the most relevant matches. Use this to recall past decisions, find related context, or check if something was already discussed recently.`,
       inputSchema: {
         type: 'object',
         properties: {
@@ -377,7 +377,7 @@ function buildTools() {
     {
       name: 'reload_source_registry',
       description:
-        `Reload the source registry cache from the database. Use this after adding or removing entries from the source_registry table to refresh which sources are enabled for insert/search filtering. Only effective when running in registry mode (MCP_SOURCE_MODE=registry).`,
+        `Reload the source registry cache from ${DB_PROFILE}.${SOURCE_REGISTRY_TABLE}. Use this after adding or removing entries to refresh which sources are enabled for insert/search filtering. Only effective when running in registry mode (MCP_SOURCE_MODE=registry).`,
       inputSchema: {
         type: 'object',
         properties: {},
@@ -386,7 +386,7 @@ function buildTools() {
     },
     {
       name: 'recall',
-      description: `Semantic recall from long-term memory (permanent knowledge base). Searches across promoted insights, digests, and archived knowledge using vector similarity. Use this to retrieve established patterns, past decisions, documented workflows, or any knowledge that was previously promoted to long-term storage. This is the primary tool for accessing institutional memory.`,
+      description: `Semantic recall from long-term memory (${DB_PROFILE}.marsvault_chunks) using Jina embeddings. Searches across promoted insights, digests, and archived knowledge using vector similarity. Use this to retrieve established patterns, past decisions, documented workflows, or any knowledge that was previously promoted to long-term storage. This is the primary tool for accessing institutional memory.`,
       inputSchema: {
         type: 'object',
         properties: {
@@ -419,7 +419,7 @@ function buildTools() {
     },
     {
       name: 'health_check',
-      description: `Run comprehensive memory system diagnostics. Returns chunk counts by type and visibility, identifies expiring short-term memories that need promotion, detects timeline coverage gaps, and finds conflicting or redundant long-term chunks. Use this regularly to maintain memory hygiene and before batch promotion.`,
+      description: `Run comprehensive ${PROFILE.displayName} memory system diagnostics. Returns chunk counts by type and visibility, identifies expiring short-term memories that need promotion, detects timeline coverage gaps, and finds conflicting or redundant long-term chunks. Use this regularly to maintain memory hygiene and before batch promotion.`,
       inputSchema: {
         type: 'object',
         properties: {
@@ -514,11 +514,11 @@ function buildTools() {
     {
       name: 'session_boot',
       description:
-        'Initialize a new session by loading identity, workflow context, and recent status from long-term memory. Also runs an expiry-focused health snapshot and records a heartbeat sign-in. Call this once at the start of every new conversation to restore continuity and awareness of pending work.',
+        `Initialize a new ${PROFILE.displayName} session by loading identity, workflow context, and recent status from long-term memory. Also runs an expiry-focused health snapshot and records a heartbeat sign-in. Call this once at the start of every new conversation to restore continuity and awareness of pending work.`,
       inputSchema: {
         type: 'object',
         properties: {
-          source: { type: 'string', enum: PROFILE.sourceWhitelist },
+          source: { type: 'string', enum: PROFILE.sourceWhitelist, description: 'Source tool identifier (e.g. "warp", "cursor", "perplexity") for provenance tracking' },
           body_name: {
             type: 'string',
             description: 'Optional body/persona name (例如：大家姐、三哥、五妹、Toto)'
@@ -551,7 +551,8 @@ function buildTools() {
             type: 'number',
             minimum: 1,
             maximum: 10,
-            default: 5
+            default: 5,
+            description: 'Maximum recall results per category (identity/workflow/status, default 5)'
           },
           alert_window_hours: {
             type: 'number',
@@ -579,7 +580,7 @@ function buildTools() {
     {
       name: 'session_close',
       description:
-        'Save a session close summary before ending a conversation. The summary is stored as a short-term memory with 7-day retention, providing context for the next session boot. Include what was accomplished, what is still pending, and any important context for continuity.',
+        `Save a ${PROFILE.displayName} session close summary before ending a conversation. The summary is stored as a short-term memory with 7-day retention, providing context for the next session boot. Include what was accomplished, what is still pending, and any important context for continuity.`,
       inputSchema: {
         type: 'object',
         properties: {
@@ -604,7 +605,7 @@ function buildTools() {
     },
     {
       name: 'dream_ingest',
-      description: `Ingest a Hermes digest (periodic summary report) into long-term memory. The content is automatically chunked into semantically meaningful segments and stored with vector embeddings for future recall. Use this for scheduled reports, daily digests, or any structured summary content that should be permanently available.`,
+      description: `Ingest a Hermes digest (periodic summary report) into ${DB_PROFILE}.marsvault_chunks long-term memory. The content is automatically chunked into semantically meaningful segments and stored with vector embeddings for future recall. Use this for scheduled reports, daily digests, or any structured summary content that should be permanently available.`,
       inputSchema: {
         type: 'object',
         properties: {
@@ -629,7 +630,7 @@ function buildTools() {
     },
     {
       name: PROFILE.memoryIngestToolName,
-      description: `Promote content into permanent long-term memory. Automatically chunks the input text, generates vector embeddings, and stores each segment for semantic recall. Use this to preserve important insights, decisions, patterns, or knowledge that should survive beyond the current session. This is the primary path from ephemeral to permanent memory.`,
+      description: `Promote content into permanent long-term memory (${DB_PROFILE}.marsvault_chunks). Automatically chunks the input text, generates vector embeddings, and stores each segment for semantic recall. Use this to preserve important insights, decisions, patterns, or knowledge that should survive beyond the current session. This is the primary path from ephemeral to permanent memory.`,
       inputSchema: {
         type: 'object',
         properties: {
@@ -678,7 +679,7 @@ function buildTools() {
     },
     {
       name: 'demote_memory',
-      description: `Deprecate a long-term memory chunk, marking it as outdated or superseded. The chunk is not deleted — it is flagged so it no longer appears in recall results. Use this when information becomes incorrect, irrelevant, or is replaced by newer knowledge. Optionally link to the replacement chunk for traceability.`,
+      description: `Deprecate a long-term memory chunk in ${DB_PROFILE}.marsvault_chunks, marking it as outdated or superseded. The chunk is not deleted — it is flagged so it no longer appears in recall results. Use this when information becomes incorrect, irrelevant, or is replaced by newer knowledge. Optionally link to the replacement chunk for traceability.`,
       inputSchema: {
         type: 'object',
         properties: {
@@ -699,7 +700,7 @@ function buildTools() {
     },
     {
       name: 'soft_forget',
-      description: `Expire short-term memories early without permanently deleting them. Marked memories become invisible to search and list operations but remain in the database for audit purposes. Use this to clean up irrelevant or incorrect short-term memories before their natural expiration.`,
+      description: `Expire short-term memories in ${DB_PROFILE}.memories early without permanently deleting them. Marked memories become invisible to search and list operations but remain in the database for audit purposes. Use this to clean up irrelevant or incorrect short-term memories before their natural expiration.`,
       inputSchema: {
         type: 'object',
         properties: {
@@ -725,7 +726,7 @@ function buildTools() {
     },
     {
       name: 'explain_memory',
-      description: `Trace the full provenance of a long-term memory chunk — where it came from, how it was created, and what source material it was derived from. Returns the original source memory, session, tool, and timeline information. Use this to understand why a piece of knowledge exists or to verify its reliability.`,
+      description: `Trace the full provenance of a long-term memory chunk in ${DB_PROFILE}.marsvault_chunks — where it came from, how it was created, and what source material it was derived from. Returns the original source memory, session, tool, and timeline information. Use this to understand why a piece of knowledge exists or to verify its reliability.`,
       inputSchema: {
         type: 'object',
         properties: {
@@ -737,7 +738,7 @@ function buildTools() {
     },
     {
       name: 'batch_promote',
-      description: `Automatically promote expiring short-term memories to permanent long-term storage. Scans for memories that will expire within the alert window, then chunks and ingests each one with vector embeddings. Use this to prevent valuable context from being lost when short-term memories expire. Supports dry-run mode to preview candidates before committing.`,
+      description: `Automatically promote expiring short-term memories from ${DB_PROFILE}.memories to permanent long-term storage (${DB_PROFILE}.marsvault_chunks). Scans for memories that will expire within the alert window, then chunks and ingests each one with vector embeddings. Use this to prevent valuable context from being lost when short-term memories expire. Supports dry-run mode to preview candidates before committing.`,
       inputSchema: {
         type: 'object',
         properties: {
