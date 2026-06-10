@@ -19,3 +19,4 @@ soul-memory/deploy/artifacts/*.tar.gz
 soul-memory/deploy/artifacts/*.manifest.json
 soul-memory/deploy/phase3/smoke-report-*.json
 .wrangler/
+.playwright-mcp/
