@@ -338,7 +338,7 @@ function buildTools() {
     },
     {
       name: 'list_memories',
-      description: `List recent short-term memories from ${DB_PROFILE}.memories in reverse chronological order. Use this to review what was recently captured, check for duplicate memories before inserting, or browse recent activity. Returns memory body, source, creation time, and expiration status.`,
+      description: `List recent short-term memories from ${DB_PROFILE}.memories in reverse chronological order — like a daily log or activity feed. Use this to review what was recently captured, check for duplicate memories before inserting, or browse recent activity. This is a time-ordered listing tool, not a search tool. For semantic search by meaning, use search_memories instead. For long-term knowledge retrieval, use recall. Returns memory body, source, creation time, and expiration status.`,
       inputSchema: {
         type: 'object',
         properties: {
