@@ -307,29 +307,29 @@ function buildTools() {
   return [
     {
       name: 'insert_memory',
-      description: `Insert a short-term ${PROFILE.displayName} memory into ${DB_PROFILE}.memories (ephemeral context)`,
+      description: `Store a short-term memory (ephemeral context that auto-expires). Use this to capture observations, decisions, session notes, or any context worth remembering temporarily. Memories last 7 days by default unless expires_at is set. For permanent knowledge, use memory_ingest instead.`,
       inputSchema: {
         type: 'object',
         properties: {
-          body: { type: 'string', description: 'Memory content text' },
+          body: { type: 'string', description: 'The memory content to store. Be specific and include relevant context — this text is used for semantic search later.' },
           source: buildMemorySourceSchema(),
-          session_id: { type: 'string', description: 'Session trace id' },
+          session_id: { type: 'string', description: 'Unique identifier for the current session/conversation. Used to group related memories together.' },
           tags: {
             type: 'array',
             items: { type: 'string' },
-            description: 'Optional tags list'
+            description: 'Categorization labels for filtering (e.g. ["decision", "architecture", "bugfix"])'
           },
           expires_at: {
             type: 'string',
-            description: 'Optional ISO timestamp override'
+            description: 'Custom expiration time in ISO 8601 format (e.g. "2026-06-17T00:00:00Z"). Defaults to 7 days from now if omitted.'
           },
           agent_body: {
             type: 'string',
-            description: 'Optional body label (default inferred from source)'
+            description: 'Which persona/agent body this memory belongs to (e.g. "coco", "toto"). Defaults to the profile of this server.'
           },
           environment: {
             type: 'string',
-            description: 'Optional environment label (default from MCP_ENVIRONMENT)'
+            description: 'Deployment environment label (e.g. "production", "staging"). Defaults to MCP_ENVIRONMENT if set.'
           }
         },
         required: ['body', 'source', 'session_id'],
@@ -338,36 +338,36 @@ function buildTools() {
     },
     {
       name: 'list_memories',
-      description: `List recent memories from ${DB_PROFILE}.memories`,
+      description: `List recent short-term memories in reverse chronological order. Use this to review what was recently captured, check for duplicate memories before inserting, or browse recent activity. Returns memory body, source, creation time, and expiration status.`,
       inputSchema: {
         type: 'object',
         properties: {
-          limit: { type: 'number', minimum: 1, maximum: 100, default: 20 },
+          limit: { type: 'number', minimum: 1, maximum: 100, default: 20, description: 'Maximum number of memories to return (default 20)' },
           source: buildMemorySourceSchema(),
-          unexpired_only: { type: 'boolean', default: true }
+          unexpired_only: { type: 'boolean', default: true, description: 'When true (default), only return memories that have not yet expired. Set false to include expired entries.' }
         },
         additionalProperties: false
       }
     },
     {
       name: 'search_memories',
-      description: `Semantic search memories from ${DB_PROFILE}.memories using Jina embeddings`,
+      description: `Semantic search across short-term memories. Finds memories by meaning, not just keywords — ask a natural language question and get the most relevant matches. Use this to recall past decisions, find related context, or check if something was already discussed recently.`,
       inputSchema: {
         type: 'object',
         properties: {
-          query: { type: 'string', description: 'Semantic search query text' },
-          limit: { type: 'number', minimum: 1, maximum: 100, default: 20 },
+          query: { type: 'string', description: 'Natural language search query. Describe what you are looking for — semantic matching finds relevant results even without exact keywords.' },
+          limit: { type: 'number', minimum: 1, maximum: 100, default: 20, description: 'Maximum number of results to return' },
           source: buildMemorySourceSchema(),
-          unexpired_only: { type: 'boolean', default: true },
-          min_similarity: { type: 'number', minimum: -1, maximum: 1 },
-          scope: { type: 'string', enum: ['this_body', 'all_bodies'], default: 'this_body' },
+          unexpired_only: { type: 'boolean', default: true, description: 'When true (default), exclude expired memories from results' },
+          min_similarity: { type: 'number', minimum: -1, maximum: 1, description: 'Minimum cosine similarity threshold for results (range -1 to 1). Higher values return fewer but more relevant matches.' },
+          scope: { type: 'string', enum: ['this_body', 'all_bodies'], default: 'this_body', description: 'Search scope: "this_body" searches only the current profile, "all_bodies" searches across all personas.' },
           agent_body: {
             type: 'string',
-            description: 'Optional body scope key; defaults to source/body/env inference'
+            description: 'Filter results to a specific persona/body (e.g. "coco", "toto")'
           },
           environment: {
             type: 'string',
-            description: 'Optional environment filter'
+            description: 'Filter results to a specific environment (e.g. "production", "staging")'
           }
         },
         required: ['query'],
@@ -377,7 +377,7 @@ function buildTools() {
     {
       name: 'reload_source_registry',
       description:
-        `Reload enabled sources cache from ${DB_PROFILE}.${SOURCE_REGISTRY_TABLE} (effective when MCP_SOURCE_MODE=registry)`,
+        `Reload the source registry cache from the database. Use this after adding or removing entries from the source_registry table to refresh which sources are enabled for insert/search filtering. Only effective when running in registry mode (MCP_SOURCE_MODE=registry).`,
       inputSchema: {
         type: 'object',
         properties: {},
@@ -386,31 +386,31 @@ function buildTools() {
     },
     {
       name: 'recall',
-      description: `Semantic recall from ${DB_PROFILE}.marsvault_chunks using Jina embeddings`,
+      description: `Semantic recall from long-term memory (permanent knowledge base). Searches across promoted insights, digests, and archived knowledge using vector similarity. Use this to retrieve established patterns, past decisions, documented workflows, or any knowledge that was previously promoted to long-term storage. This is the primary tool for accessing institutional memory.`,
       inputSchema: {
         type: 'object',
         properties: {
-          query: { type: 'string', description: 'Semantic recall query text' },
-          limit: { type: 'number', minimum: 1, maximum: 50, default: 5 },
-          body: { type: 'string', enum: PROFILE.recallBodyEnum, default: DB_PROFILE },
-          include_global: { type: 'boolean', default: true },
-          include_shared: { type: 'boolean', default: true },
-          include_private: { type: 'boolean', default: true },
-          type: { type: 'string', description: 'Optional chunk type filter' },
-          min_similarity: { type: 'number', minimum: -1, maximum: 1 },
-          scope: { type: 'string', enum: ['this_body', 'all_bodies'], default: 'this_body' },
+          query: { type: 'string', description: 'Natural language query describing what knowledge you need. The system finds semantically similar chunks — describe the concept, not just keywords.' },
+          limit: { type: 'number', minimum: 1, maximum: 50, default: 5, description: 'Maximum number of chunks to return (default 5)' },
+          body: { type: 'string', enum: PROFILE.recallBodyEnum, default: DB_PROFILE, description: 'Which persona profile to search in (e.g. "coco", "toto", "system")' },
+          include_global: { type: 'boolean', default: true, description: 'Include globally visible chunks in results' },
+          include_shared: { type: 'boolean', default: true, description: 'Include shared-visibility chunks in results' },
+          include_private: { type: 'boolean', default: true, description: 'Include private chunks in results' },
+          type: { type: 'string', description: 'Filter by chunk type (e.g. "insight", "digest", "observation")' },
+          min_similarity: { type: 'number', minimum: -1, maximum: 1, description: 'Minimum cosine similarity threshold. Raise for higher precision, lower for broader recall.' },
+          scope: { type: 'string', enum: ['this_body', 'all_bodies'], default: 'this_body', description: 'Search scope: "this_body" for current profile only, "all_bodies" for cross-persona search' },
           agent_body: {
             type: 'string',
-            description: 'Optional body scope key; defaults to MCP_AGENT_BODY when present'
+            description: 'Filter to a specific persona/body scope'
           },
           environment: {
             type: 'string',
-            description: 'Optional environment filter'
+            description: 'Filter to a specific environment label'
           },
           debug_explain: {
             type: 'boolean',
             default: false,
-            description: 'Include query/hit token overlap debug details'
+            description: 'When true, include token overlap details in each result for debugging relevance'
           }
         },
         required: ['query'],
@@ -419,7 +419,7 @@ function buildTools() {
     },
     {
       name: 'health_check',
-      description: `Run ${PROFILE.displayName} memory health diagnostics (count_chunks, expiry_alert, coverage_map, detect_conflicts)`,
+      description: `Run comprehensive memory system diagnostics. Returns chunk counts by type and visibility, identifies expiring short-term memories that need promotion, detects timeline coverage gaps, and finds conflicting or redundant long-term chunks. Use this regularly to maintain memory hygiene and before batch promotion.`,
       inputSchema: {
         type: 'object',
         properties: {
@@ -514,7 +514,7 @@ function buildTools() {
     {
       name: 'session_boot',
       description:
-        'One-call session boot rhythm: always run identity/workflow/status recall + expiry-focused health snapshot + heartbeat sign-in',
+        'Initialize a new session by loading identity, workflow context, and recent status from long-term memory. Also runs an expiry-focused health snapshot and records a heartbeat sign-in. Call this once at the start of every new conversation to restore continuity and awareness of pending work.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -579,7 +579,7 @@ function buildTools() {
     {
       name: 'session_close',
       description:
-        'Store session close summary with 7-day retention for CoCo/Toto rhythm closure',
+        'Save a session close summary before ending a conversation. The summary is stored as a short-term memory with 7-day retention, providing context for the next session boot. Include what was accomplished, what is still pending, and any important context for continuity.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -604,24 +604,24 @@ function buildTools() {
     },
     {
       name: 'dream_ingest',
-      description: `Chunk and ingest Hermes digest text into ${DB_PROFILE}.marsvault_chunks as long-term insight data`,
+      description: `Ingest a Hermes digest (periodic summary report) into long-term memory. The content is automatically chunked into semantically meaningful segments and stored with vector embeddings for future recall. Use this for scheduled reports, daily digests, or any structured summary content that should be permanently available.`,
       inputSchema: {
         type: 'object',
         properties: {
-          content: { type: 'string', description: 'Digest full text content' },
-          source_file: { type: 'string', description: 'Logical source path for digest' },
-          section: { type: 'string', description: 'Section label prefix' },
+          content: { type: 'string', description: 'The full text content of the digest to ingest. Will be automatically split into semantically coherent chunks.' },
+          source_file: { type: 'string', description: 'Logical file path or identifier for the source of this digest (e.g. "hermes/daily/2026-06-10")' },
+          section: { type: 'string', description: 'Optional section label prefix to tag all resulting chunks' },
           tags: {
             type: 'array',
             items: { type: 'string' },
-            description: 'Optional tags list'
+            description: 'Tags for categorization (e.g. ["digest", "daily", "report"])'
           },
-          type: { type: 'string', description: 'Chunk type', default: 'digest' },
-          date: { type: 'string', description: 'Optional YYYY-MM-DD date override' },
-          body: { type: 'string', enum: PROFILE.recallBodyEnum, default: DB_PROFILE },
-          visibility: { type: 'string', enum: ['private', 'shared', 'global'], default: 'private' },
-          origin: { type: 'string', description: 'Origin marker', default: PROFILE.digestDefaultOrigin },
-          max_chunk_chars: { type: 'number', minimum: 300, maximum: 3000, default: 1200 }
+          type: { type: 'string', description: 'Chunk type label', default: 'digest' },
+          date: { type: 'string', description: 'Date for this digest in YYYY-MM-DD format. Defaults to today if omitted.' },
+          body: { type: 'string', enum: PROFILE.recallBodyEnum, default: DB_PROFILE, description: 'Target persona profile for storage' },
+          visibility: { type: 'string', enum: ['private', 'shared', 'global'], default: 'private', description: 'Access level: "private" = owner only, "shared" = cross-profile, "global" = system-wide' },
+          origin: { type: 'string', description: 'Origin marker identifying where this content came from', default: PROFILE.digestDefaultOrigin },
+          max_chunk_chars: { type: 'number', minimum: 300, maximum: 3000, default: 1200, description: 'Maximum character length per chunk (default 1200). Larger values = fewer, longer chunks.' }
         },
         required: ['content'],
         additionalProperties: false
@@ -629,48 +629,48 @@ function buildTools() {
     },
     {
       name: PROFILE.memoryIngestToolName,
-      description: `Chunk and ingest ${PROFILE.displayName} long-term insight content into ${DB_PROFILE}.marsvault_chunks (not short-memory)`,
+      description: `Promote content into permanent long-term memory. Automatically chunks the input text, generates vector embeddings, and stores each segment for semantic recall. Use this to preserve important insights, decisions, patterns, or knowledge that should survive beyond the current session. This is the primary path from ephemeral to permanent memory.`,
       inputSchema: {
         type: 'object',
         properties: {
-          content: { type: 'string', description: 'Insight full text content' },
-          source_file: { type: 'string', description: 'Logical source path for insight content' },
-          section: { type: 'string', description: 'Section label prefix' },
+          content: { type: 'string', description: 'The insight content to promote to long-term memory. Be specific and self-contained — future recall depends on the quality of this text.' },
+          source_file: { type: 'string', description: 'Logical file path or identifier for the source (e.g. "sessions/2026-06-10-session-notes")' },
+          section: { type: 'string', description: 'Optional section label prefix to organize chunks within the source' },
           tags: {
             type: 'array',
             items: { type: 'string' },
-            description: 'Optional tags list'
+            description: 'Categorization tags (e.g. ["decision", "architecture"])'
           },
-          type: { type: 'string', description: 'Chunk type', default: 'insight' },
-          date: { type: 'string', description: 'Optional YYYY-MM-DD date override' },
-          visibility: { type: 'string', enum: ['private', 'shared', 'global'], default: 'private' },
+          type: { type: 'string', description: 'Content type label (e.g. "insight", "observation", "decision")', default: 'insight' },
+          date: { type: 'string', description: 'Date for this content in YYYY-MM-DD format. Defaults to today if omitted.' },
+          visibility: { type: 'string', enum: ['private', 'shared', 'global'], default: 'private', description: 'Access level: "private" = this profile only, "shared" = cross-profile readable, "global" = system-wide' },
           origin: buildMemoryIngestOriginSchema(),
           source_memory_id: {
             type: 'string',
-            description: 'Optional short-memory id to link promoted long-memory chunks'
+            description: 'Link this promotion to a specific short-term memory ID (for traceability)'
           },
           source_session_id: {
             type: 'string',
-            description: 'Optional source session id for provenance'
+            description: 'Session ID where this insight originated (for provenance tracking)'
           },
           source_tool: {
             type: 'string',
             enum: PROFILE.sourceWhitelist,
-            description: 'Optional source tool for provenance'
+            description: 'The tool/platform where this insight was originally captured'
           },
           source_user_note: {
             type: 'string',
-            description: 'Optional user note describing why this memory was promoted'
+            description: 'Brief note explaining why this memory was selected for promotion'
           },
           agent_body: {
             type: 'string',
-            description: 'Optional body label for memory boundary'
+            description: 'The persona/body this memory belongs to (e.g. "coco", "toto")'
           },
           environment: {
             type: 'string',
-            description: 'Optional environment label'
+            description: 'Environment label (e.g. "production", "staging")'
           },
-          max_chunk_chars: { type: 'number', minimum: 300, maximum: 3000, default: 1200 }
+          max_chunk_chars: { type: 'number', minimum: 300, maximum: 3000, default: 1200, description: 'Maximum characters per chunk (default 1200). Adjust for finer or coarser granularity.' }
         },
         required: ['content'],
         additionalProperties: false
@@ -678,19 +678,19 @@ function buildTools() {
     },
     {
       name: 'demote_memory',
-      description: `Mark a long-memory chunk as deprecated/superseded in ${DB_PROFILE}.marsvault_chunks`,
+      description: `Deprecate a long-term memory chunk, marking it as outdated or superseded. The chunk is not deleted — it is flagged so it no longer appears in recall results. Use this when information becomes incorrect, irrelevant, or is replaced by newer knowledge. Optionally link to the replacement chunk for traceability.`,
       inputSchema: {
         type: 'object',
         properties: {
-          id: { type: 'string', description: 'Long-memory chunk id (UUID)' },
-          deprecated_reason: { type: 'string', description: 'Reason for deprecation' },
+          id: { type: 'string', description: 'UUID of the long-term memory chunk to deprecate' },
+          deprecated_reason: { type: 'string', description: 'Why this memory is being deprecated (e.g. "superseded by newer architecture decision", "information confirmed incorrect")' },
           superseded_by: {
             type: 'string',
-            description: 'Optional replacement chunk id (UUID) when this memory is superseded'
+            description: 'UUID of the replacement chunk, if this memory is being superseded by updated content'
           },
           deprecated_at: {
             type: 'string',
-            description: 'Optional ISO timestamp override; defaults to now'
+            description: 'Custom deprecation timestamp in ISO 8601 format. Defaults to now if omitted.'
           }
         },
         required: ['id', 'deprecated_reason'],
@@ -699,7 +699,7 @@ function buildTools() {
     },
     {
       name: 'soft_forget',
-      description: `Expire short-memory rows early in ${DB_PROFILE}.memories (manual cleanup without hard delete)`,
+      description: `Expire short-term memories early without permanently deleting them. Marked memories become invisible to search and list operations but remain in the database for audit purposes. Use this to clean up irrelevant or incorrect short-term memories before their natural expiration.`,
       inputSchema: {
         type: 'object',
         properties: {
@@ -708,15 +708,15 @@ function buildTools() {
             items: { type: 'string' },
             minItems: 1,
             maxItems: 50,
-            description: 'Short-memory IDs (UUID) to expire immediately'
+            description: 'Array of short-term memory UUIDs to expire. Up to 50 at a time.'
           },
           reason: {
             type: 'string',
-            description: 'Optional note for why these memories are being soft-forgotten'
+            description: 'Brief explanation of why these memories are being forgotten (for audit trail)'
           },
           forgotten_at: {
             type: 'string',
-            description: 'Optional ISO timestamp override; defaults to now'
+            description: 'Custom expiration timestamp in ISO 8601 format. Defaults to now if omitted.'
           }
         },
         required: ['ids'],
@@ -725,11 +725,11 @@ function buildTools() {
     },
     {
       name: 'explain_memory',
-      description: `Explain provenance of a long-memory chunk in ${DB_PROFILE}.marsvault_chunks (source memory/session/tool/timeline)`,
+      description: `Trace the full provenance of a long-term memory chunk — where it came from, how it was created, and what source material it was derived from. Returns the original source memory, session, tool, and timeline information. Use this to understand why a piece of knowledge exists or to verify its reliability.`,
       inputSchema: {
         type: 'object',
         properties: {
-          id: { type: 'string', description: 'Long-memory chunk id (UUID)' }
+          id: { type: 'string', description: 'UUID of the long-term memory chunk to explain' }
         },
         required: ['id'],
         additionalProperties: false
@@ -737,7 +737,7 @@ function buildTools() {
     },
     {
       name: 'batch_promote',
-      description: `Auto-promote expiring short memories to long-term ${DB_PROFILE}.marsvault_chunks. Finds candidates via health check scoring, ingests content, marks promoted.`,
+      description: `Automatically promote expiring short-term memories to permanent long-term storage. Scans for memories that will expire within the alert window, then chunks and ingests each one with vector embeddings. Use this to prevent valuable context from being lost when short-term memories expire. Supports dry-run mode to preview candidates before committing.`,
       inputSchema: {
         type: 'object',
         properties: {
@@ -746,29 +746,29 @@ function buildTools() {
             minimum: 1,
             maximum: 720,
             default: 48,
-            description: 'Look-ahead window for expiring memories (hours)'
+            description: 'Look-ahead window in hours. Memories expiring within this window are candidates for promotion (default 48).'
           },
           max_promote: {
             type: 'number',
             minimum: 1,
             maximum: 50,
             default: 10,
-            description: 'Maximum memories to promote in one batch'
+            description: 'Maximum number of memories to promote in a single batch (default 10).'
           },
           dry_run: {
             type: 'boolean',
             default: false,
-            description: 'If true, list candidates without promoting'
+            description: 'When true, list candidate memories without actually promoting them. Use to preview before committing.'
           },
           memory_ids: {
             type: 'array',
             items: { type: 'string' },
             maxItems: 50,
-            description: 'Optional explicit memory IDs to promote (skips auto-detection)'
+            description: 'Explicit list of short-term memory UUIDs to promote. When provided, auto-detection is skipped and only these IDs are processed.'
           },
           origin: {
             type: 'string',
-            description: 'Origin marker for promoted chunks',
+            description: 'Origin marker tagged on all promoted chunks for traceability',
             default: 'batch-promote'
           }
         },
