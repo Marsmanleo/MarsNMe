@@ -775,6 +775,82 @@ function buildTools() {
         },
         additionalProperties: false
       }
+    },
+    {
+      name: 'save_prd',
+      description: `Create or update a PRD draft in ${DB_PROFILE}.prd_drafts. When id is provided, updates the existing draft; otherwise creates a new one. PRDs progress through stages: seed → draft → ready → spawn → shipped. Use this to capture product ideas, refine requirements, and track PRD maturity.`,
+      inputSchema: {
+        type: 'object',
+        properties: {
+          id: { type: 'string', description: 'UUID of an existing PRD draft to update. Omit to create a new draft.' },
+          title: { type: 'string', description: 'PRD title — a short, descriptive name for the product requirement.' },
+          description: { type: 'string', description: 'Full PRD content in Markdown. Include problem statement, proposed solution, acceptance criteria, and technical notes.' },
+          project_id: { type: 'string', description: 'UUID of the parent project this PRD belongs to (from prd_projects table).' },
+          stage: { type: 'string', enum: ['seed', 'draft', 'ready', 'spawn', 'shipped'], description: 'Current maturity stage of the PRD.' },
+          priority: { type: 'string', enum: ['low', 'medium', 'high', 'urgent'], description: 'Priority level of this PRD.' },
+          memoryreferences: {
+            type: 'array',
+            items: { type: 'string' },
+            description: 'Array of MarsVault memory chunk IDs or references that provide context for this PRD.'
+          },
+          company_id: { type: 'string', description: 'Company identifier. Defaults to MCP_COMPANY_ID env var or "mars-group".' }
+        },
+        required: [],
+        additionalProperties: false
+      }
+    },
+    {
+      name: 'get_prd',
+      description: `Retrieve a PRD draft by ID from ${DB_PROFILE}.prd_drafts, including any linked Linear issue connections. Use this to read the full content and status of a specific PRD.`,
+      inputSchema: {
+        type: 'object',
+        properties: {
+          id: { type: 'string', description: 'UUID of the PRD draft to retrieve.' }
+        },
+        required: ['id'],
+        additionalProperties: false
+      }
+    },
+    {
+      name: 'list_prds',
+      description: `List PRD drafts from ${DB_PROFILE}.prd_drafts in reverse chronological order. Filter by stage, project, or status. Use this to browse existing PRDs, find drafts ready for review, or check what is in the pipeline.`,
+      inputSchema: {
+        type: 'object',
+        properties: {
+          stage: { type: 'string', enum: ['seed', 'draft', 'ready', 'spawn', 'shipped'], description: 'Filter by PRD stage.' },
+          project_id: { type: 'string', description: 'Filter by parent project UUID.' },
+          status: { type: 'string', enum: ['active', 'archived'], default: 'active', description: 'Filter by status (default: active).' },
+          limit: { type: 'number', minimum: 1, maximum: 100, default: 20, description: 'Maximum number of PRDs to return (default 20).' },
+          company_id: { type: 'string', description: 'Company identifier filter. Defaults to MCP_COMPANY_ID env var or "mars-group".' }
+        },
+        additionalProperties: false
+      }
+    },
+    {
+      name: 'score_prd',
+      description: `Calculate and store a maturity score (0-100) for a PRD draft in ${DB_PROFILE}.prd_drafts. The score is computed from: title presence, description length and quality, stage advancement, memory references count, project assignment, and priority setting. Use this to assess whether a PRD is ready to be spawned to a Linear issue.`,
+      inputSchema: {
+        type: 'object',
+        properties: {
+          id: { type: 'string', description: 'UUID of the PRD draft to score.' }
+        },
+        required: ['id'],
+        additionalProperties: false
+      }
+    },
+    {
+      name: 'spawn_to_linear',
+      description: `Prepare a PRD draft for spawning to a Linear issue. Validates the PRD meets the minimum maturity threshold (score >= 40 or stage is "ready"), updates the stage to "spawn", and returns a structured payload ready for Linear issue creation. After creating the Linear issue via Linear MCP, call save_prd to record the linear_issue_id back on the PRD.`,
+      inputSchema: {
+        type: 'object',
+        properties: {
+          id: { type: 'string', description: 'UUID of the PRD draft to spawn.' },
+          linear_issue_id: { type: 'string', description: 'If the Linear issue has already been created, pass its ID here to record the connection and update stage to "shipped".' },
+          score_threshold: { type: 'number', minimum: 0, maximum: 100, default: 40, description: 'Minimum score required to spawn (default 40). Set to 0 to bypass score check.' }
+        },
+        required: ['id'],
+        additionalProperties: false
+      }
     }
   ];
 }
@@ -1535,6 +1611,19 @@ function estimateToolUsageTokens(toolName, args = {}) {
       break;
     case 'soft_forget':
       appendTokenCharCount(safeArgs.reason, state);
+      break;
+    case 'save_prd':
+      appendTokenCharCount(safeArgs.title, state);
+      appendTokenCharCount(safeArgs.description, state);
+      break;
+    case 'get_prd':
+    case 'score_prd':
+      break;
+    case 'list_prds':
+      appendTokenCharCount(safeArgs.stage, state);
+      break;
+    case 'spawn_to_linear':
+      appendTokenCharCount(safeArgs.linear_issue_id, state);
       break;
     default:
       if (TOOL_USAGE_INGEST_NAMES.has(normalizedToolName)) {
@@ -3990,6 +4079,232 @@ async function callTool(name, args = {}) {
               promoted_at: promotedMemory.promoted_at || null
             }
           : null
+      };
+    }
+
+    // ── PRD Draft Tools ─────────────────────────────────────────────
+    const PRD_COMPANY_ID = String(process.env.MCP_COMPANY_ID || 'mars-group').trim();
+    const PRD_SELECT = 'id,company_id,project_id,title,description,stage,memoryreferences,priority,score,lastscoredat,spawnedlinearissueid,status,created_at,updated_at';
+
+    if (toolName === 'save_prd') {
+      const existingId = normalizeOptionalUuid(args.id, 'id');
+      const title = normalizeOptionalText(args.title, 500);
+      const description = args.description !== undefined ? String(args.description || '').trim() : undefined;
+      const projectId = normalizeOptionalUuid(args.project_id, 'project_id');
+      const stage = args.stage || undefined;
+      const priority = args.priority || undefined;
+      const memoryreferences = Array.isArray(args.memoryreferences) ? args.memoryreferences.filter(Boolean) : undefined;
+      const companyId = normalizeOptionalText(args.company_id, 100) || PRD_COMPANY_ID;
+
+      if (existingId) {
+        // Update existing PRD
+        const patch = {};
+        if (title !== undefined) patch.title = title;
+        if (description !== undefined) patch.description = description;
+        if (projectId !== undefined) patch.project_id = projectId;
+        if (stage !== undefined) patch.stage = stage;
+        if (priority !== undefined) patch.priority = priority;
+        if (memoryreferences !== undefined) patch.memoryreferences = memoryreferences;
+        if (Object.keys(patch).length === 0) {
+          throw new Error('No fields to update. Provide at least one field to change.');
+        }
+        const result = await supabaseRequest(
+          `/rest/v1/prd_drafts?id=eq.${existingId}&select=${PRD_SELECT}`,
+          { method: 'PATCH', profile: DB_PROFILE, prefer: 'return=representation', body: patch }
+        );
+        const updated = Array.isArray(result) ? result[0] : null;
+        if (!updated) throw new Error(`PRD not found: ${existingId}`);
+        return { ok: true, action: 'updated', prd: updated };
+      } else {
+        // Create new PRD
+        if (!title) throw new Error('title is required when creating a new PRD');
+        const newId = crypto.randomUUID();
+        const payload = {
+          id: newId,
+          company_id: companyId,
+          title,
+          ...(description !== undefined ? { description } : {}),
+          ...(projectId ? { project_id: projectId } : {}),
+          ...(stage ? { stage } : {}),
+          ...(priority ? { priority } : {}),
+          ...(memoryreferences ? { memoryreferences } : {})
+        };
+        const result = await supabaseRequest(
+          `/rest/v1/prd_drafts?select=${PRD_SELECT}`,
+          { method: 'POST', profile: DB_PROFILE, prefer: 'return=representation', body: [payload] }
+        );
+        const created = Array.isArray(result) ? result[0] : null;
+        if (!created) {
+          const fetched = await supabaseRequest(
+            `/rest/v1/prd_drafts?id=eq.${newId}&select=${PRD_SELECT}`,
+            { profile: DB_PROFILE }
+          );
+          return { ok: true, action: 'created', prd: fetched?.[0] || { id: newId } };
+        }
+        return { ok: true, action: 'created', prd: created };
+      }
+    }
+
+    if (toolName === 'get_prd') {
+      const prdId = normalizeOptionalUuid(args.id, 'id');
+      if (!prdId) throw new Error('id is required');
+      const result = await supabaseRequest(
+        `/rest/v1/prd_drafts?id=eq.${prdId}&select=${PRD_SELECT}`,
+        { profile: DB_PROFILE }
+      );
+      const prd = Array.isArray(result) ? result[0] : null;
+      if (!prd) throw new Error(`PRD not found: ${prdId}`);
+      // Fetch linked Linear connections
+      let linearConnections = [];
+      try {
+        const conns = await supabaseRequest(
+          `/rest/v1/prd_linear_connections?prd_id=eq.${prdId}&select=id,linearissueid,spawnedat,last_synced_state&order=spawnedat.desc`,
+          { profile: DB_PROFILE }
+        );
+        linearConnections = Array.isArray(conns) ? conns : [];
+      } catch { /* non-critical */ }
+      return { ok: true, prd, linear_connections: linearConnections };
+    }
+
+    if (toolName === 'list_prds') {
+      const limitRaw = Number(args.limit ?? 20);
+      const limit = Number.isFinite(limitRaw) ? Math.max(1, Math.min(100, Math.trunc(limitRaw))) : 20;
+      const companyId = normalizeOptionalText(args.company_id, 100) || PRD_COMPANY_ID;
+      const status = args.status || 'active';
+      const query = new URLSearchParams();
+      query.set('select', PRD_SELECT);
+      query.set('company_id', `eq.${companyId}`);
+      query.set('status', `eq.${status}`);
+      query.set('order', 'updated_at.desc');
+      query.set('limit', String(limit));
+      if (args.stage) query.set('stage', `eq.${args.stage}`);
+      if (args.project_id) {
+        const pid = normalizeOptionalUuid(args.project_id, 'project_id');
+        if (pid) query.set('project_id', `eq.${pid}`);
+      }
+      const result = await supabaseRequest(
+        `/rest/v1/prd_drafts?${query.toString()}`,
+        { profile: DB_PROFILE }
+      );
+      return {
+        ok: true,
+        count: Array.isArray(result) ? result.length : 0,
+        items: Array.isArray(result) ? result : []
+      };
+    }
+
+    if (toolName === 'score_prd') {
+      const prdId = normalizeOptionalUuid(args.id, 'id');
+      if (!prdId) throw new Error('id is required');
+      const result = await supabaseRequest(
+        `/rest/v1/prd_drafts?id=eq.${prdId}&select=${PRD_SELECT}`,
+        { profile: DB_PROFILE }
+      );
+      const prd = Array.isArray(result) ? result[0] : null;
+      if (!prd) throw new Error(`PRD not found: ${prdId}`);
+      // Score calculation (0-100)
+      let score = 0;
+      const breakdown = {};
+      // Title (10 pts)
+      if (prd.title && prd.title.length > 0) { score += 10; breakdown.title = 10; }
+      // Description length (0-30 pts)
+      const descLen = (prd.description || '').length;
+      if (descLen > 500) { score += 30; breakdown.description = 30; }
+      else if (descLen > 200) { score += 20; breakdown.description = 20; }
+      else if (descLen > 50) { score += 10; breakdown.description = 10; }
+      else { breakdown.description = 0; }
+      // Stage advancement (0-20 pts)
+      const stageScores = { seed: 0, draft: 10, ready: 20, spawn: 20, shipped: 20 };
+      const stageScore = stageScores[prd.stage] || 0;
+      score += stageScore; breakdown.stage = stageScore;
+      // Memory references (0-15 pts)
+      const refCount = Array.isArray(prd.memoryreferences) ? prd.memoryreferences.length : 0;
+      const refScore = Math.min(15, refCount * 5);
+      score += refScore; breakdown.memory_references = refScore;
+      // Project assignment (10 pts)
+      if (prd.project_id) { score += 10; breakdown.project = 10; } else { breakdown.project = 0; }
+      // Priority set (5 pts)
+      if (prd.priority && prd.priority !== 'medium') { score += 5; breakdown.priority = 5; } else { breakdown.priority = 0; }
+      // Has acceptance criteria in description (10 pts)
+      const hasAcceptance = /acceptance|criteria|驗收|done when/i.test(prd.description || '');
+      if (hasAcceptance) { score += 10; breakdown.acceptance_criteria = 10; } else { breakdown.acceptance_criteria = 0; }
+      score = Math.min(100, score);
+      // Store score
+      const now = new Date().toISOString();
+      await supabaseRequest(
+        `/rest/v1/prd_drafts?id=eq.${prdId}`,
+        { method: 'PATCH', profile: DB_PROFILE, prefer: 'return=minimal', body: { score, lastscoredat: now } }
+      );
+      return {
+        ok: true,
+        id: prdId,
+        score,
+        breakdown,
+        scored_at: now,
+        ready_to_spawn: score >= 40,
+        suggestion: score < 40
+          ? 'Add more description, memory references, or acceptance criteria to improve the score.'
+          : score < 70
+            ? 'PRD is ready to spawn but could benefit from more detail.'
+            : 'PRD is mature and ready for Linear.'
+      };
+    }
+
+    if (toolName === 'spawn_to_linear') {
+      const prdId = normalizeOptionalUuid(args.id, 'id');
+      if (!prdId) throw new Error('id is required');
+      const linearIssueId = normalizeOptionalText(args.linear_issue_id, 100);
+      const scoreThreshold = Number(args.score_threshold ?? 40);
+      const result = await supabaseRequest(
+        `/rest/v1/prd_drafts?id=eq.${prdId}&select=${PRD_SELECT}`,
+        { profile: DB_PROFILE }
+      );
+      const prd = Array.isArray(result) ? result[0] : null;
+      if (!prd) throw new Error(`PRD not found: ${prdId}`);
+      // If linear_issue_id provided, record the connection
+      if (linearIssueId) {
+        const connId = crypto.randomUUID();
+        await supabaseRequest(
+          '/rest/v1/prd_linear_connections',
+          { method: 'POST', profile: DB_PROFILE, prefer: 'return=minimal', body: [{ id: connId, prd_id: prdId, linearissueid: linearIssueId }] }
+        );
+        await supabaseRequest(
+          `/rest/v1/prd_drafts?id=eq.${prdId}`,
+          { method: 'PATCH', profile: DB_PROFILE, prefer: 'return=minimal', body: { stage: 'shipped', spawnedlinearissueid: linearIssueId } }
+        );
+        return { ok: true, action: 'recorded', prd_id: prdId, linear_issue_id: linearIssueId, stage: 'shipped' };
+      }
+      // Validate readiness
+      const currentScore = prd.score || 0;
+      if (scoreThreshold > 0 && currentScore < scoreThreshold && prd.stage !== 'ready') {
+        return {
+          ok: false,
+          error: 'not_ready',
+          score: currentScore,
+          threshold: scoreThreshold,
+          stage: prd.stage,
+          message: `PRD score (${currentScore}) is below threshold (${scoreThreshold}) and stage is not "ready". Run score_prd first or add more content.`
+        };
+      }
+      // Update stage to spawn
+      await supabaseRequest(
+        `/rest/v1/prd_drafts?id=eq.${prdId}`,
+        { method: 'PATCH', profile: DB_PROFILE, prefer: 'return=minimal', body: { stage: 'spawn' } }
+      );
+      // Return structured payload for Linear issue creation
+      return {
+        ok: true,
+        action: 'ready_to_spawn',
+        prd_id: prdId,
+        stage: 'spawn',
+        score: currentScore,
+        linear_payload: {
+          title: prd.title,
+          description: prd.description || '',
+          priority: prd.priority === 'urgent' ? 1 : prd.priority === 'high' ? 2 : prd.priority === 'medium' ? 3 : 4,
+          labels: ['PRD']
+        },
+        next_step: 'Create the Linear issue using the linear_payload above, then call spawn_to_linear again with the linear_issue_id to record the connection.'
       };
     }
 
