@@ -4880,6 +4880,25 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // Streamable HTTP: this server is POST-only (no SSE streaming of
+  // server-initiated notifications). Per MCP spec, respond to GET /mcp with
+  // 405 Method Not Allowed + an `allow` header so compliant clients (Cursor,
+  // Claude Desktop, etc.) fall back to POST-only request/response instead
+  // of treating the missing stream as a fatal transport error (404 would
+  // cause Cursor's V2 FSM to tombstone the transport after 5 retries).
+  if (
+    req.method === 'GET' &&
+    ['/mcp', '/mcp/', '/'].includes(url.pathname)
+  ) {
+    res.writeHead(405, {
+      'access-control-allow-origin': '*',
+      allow: 'POST',
+      'cache-control': 'no-store'
+    });
+    res.end();
+    return;
+  }
+
   if (req.method !== 'POST' || !['/mcp', '/mcp/', '/'].includes(url.pathname)) {
     json(res, 404, { error: 'not_found' });
     return;
