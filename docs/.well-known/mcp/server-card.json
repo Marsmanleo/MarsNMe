@@ -2,7 +2,7 @@
   "name": "MarsNMe",
   "title": "MarsNMe — AI Persistent Memory",
   "description": "Agent-agnostic persistent memory backend for AI. Two-tier memory (short-term + long-term), semantic search via Jina embeddings v3, multi-profile isolation, built on Supabase pgvector.",
-  "version": "0.1.8",
+  "version": "0.2.2",
   "homepage": "https://marsnme.com",
   "repository": "https://github.com/Marsmanleo/MarsNMe",
   "author": {
@@ -17,7 +17,7 @@
     "mcp": "/mcp",
     "health": "/health"
   },
-  "tools_count": 13,
+  "tools_count": 14,
   "install": {
     "npm": "npx @marsnme/mcp-gateway",
     "package": "@marsnme/mcp-gateway"

@@ -92,7 +92,7 @@ Most AI memory tools help AI remember you. **MarsNMe helps you and your AI remem
 | `marsnme-cf/` | Cloudflare Workers + D1 + Vectorize | Self-host template; **not** the Proxmox deploy path |
 | `marsnme-supabase/cloudflare-routing-worker/` | `mcp.marsnme.com` routing proxy | Public setup wizard → upstream gateway |
 
-**Product split (Mars Group):** Idea / PRD / task execution → [Draft](https://github.com/Marsmanleo/draft-ai) + `draft-mcp`. **MarsNMe Supabase = CoCo soul memory only** (recall, session boot/close, ingest, lifecycle).
+**Product split (Mars Group):** Idea / PRD / task execution → [Draft](https://github.com/Marsmanleo/draft-ai) + `draft-mcp`. **MarsNMe Supabase = CoCo soul memory only** (recall, session boot/close, ingest, lifecycle). As of `@marsnme/mcp-gateway` v0.2.2, PRD MCP tools (`save_prd`, `get_prd`, `list_prds`, `score_prd`, `spawn_to_linear`) are removed from the Supabase gateway — use Draft for idea/PRD/task workflows.
 
 **Proxmox deploy:** private [MarsNMe-lab](https://github.com/Marsmanleo/MarsNMe-lab) — `deploy/deploy-proxmox-ct101.sh` or GitHub `cd-selfhosted` workflow. Not a single-script deploy like draft-mcp.
 
