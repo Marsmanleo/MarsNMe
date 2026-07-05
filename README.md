@@ -84,6 +84,20 @@ Most AI memory tools help AI remember you. **MarsNMe helps you and your AI remem
 - You only need single-session context (just use the system prompt)
 - You want fully managed, zero-config memory with no setup (try a hosted solution)
 
+## Runtime packages (folder map)
+
+Two MCP runtimes live in this repo. **Folder rename to `marsnme-supabase/` and `marsnme-cf/` is planned**; until then, use this table.
+
+| Current folder | Planned name | Runtime | Who uses it |
+|---|---|---|---|
+| `soul-memory/` | `marsnme-supabase/` | Supabase + Jina gateway (`@marsnme/mcp-gateway`) | **Mars Group dogfood** — Proxmox CT101 (CoCo / Toto soul memory) |
+| `marsnme-local/` | `marsnme-cf/` | Cloudflare Workers + D1 + Vectorize | Self-host template; **not** the Proxmox deploy path |
+| `soul-memory/cloudflare-routing-worker/` | (stays under supabase package) | `mcp.marsnme.com` routing proxy | Public setup wizard → upstream gateway |
+
+**Product split (Mars Group):** Idea / PRD / task execution → [Draft](https://github.com/Marsmanleo/draft-ai) + `draft-mcp`. **MarsNMe Supabase = CoCo soul memory only** (recall, session boot/close, ingest, lifecycle).
+
+**Proxmox deploy:** private [MarsNMe-lab](https://github.com/Marsmanleo/MarsNMe-lab) — `deploy/deploy-proxmox-ct101.sh` or GitHub `cd-selfhosted` workflow. Not a single-script deploy like draft-mcp.
+
 ## Repository Packages
 
 | Package | Description |
