@@ -168,7 +168,7 @@ export async function listInsights(
   limit = 20
 ): Promise<Insight[]> {
   const { results } = await env.DB.prepare(
-    `SELECT * FROM insights WHERE profile = ? ORDER BY created_at DESC LIMIT ?`
+    `SELECT * FROM insights WHERE profile = ? ORDER BY CASE WHEN origin_type = 'session_close' THEN 0 ELSE 1 END, created_at DESC LIMIT ?`
   )
     .bind(profile, Math.min(limit, 100))
     .all();
