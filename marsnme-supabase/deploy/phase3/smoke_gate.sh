@@ -112,9 +112,9 @@ mcp_jsonrpc() {
 if [[ "${SPAWN_LOCAL}" == "true" ]]; then
   COCO_LOG="/tmp/mars-memory-coco-smoke.log"
   TOTO_LOG="/tmp/mars-memory-toto-smoke.log"
-  MCP_PROFILE=coco PORT=18790 SUPABASE_BASE_URL="${SUPABASE_BASE_URL_FOR_LOCAL}" MCP_REQUIRE_BEARER=false node "${REPO_ROOT}/soul-memory/server.mjs" >"${COCO_LOG}" 2>&1 &
+  MCP_PROFILE=coco PORT=18790 SUPABASE_BASE_URL="${SUPABASE_BASE_URL_FOR_LOCAL}" MCP_REQUIRE_BEARER=false node "${REPO_ROOT}/marsnme-supabase/server.mjs" >"${COCO_LOG}" 2>&1 &
   COCO_PID="$!"
-  MCP_PROFILE=toto PORT=18791 SUPABASE_BASE_URL="${SUPABASE_BASE_URL_FOR_LOCAL}" MCP_REQUIRE_BEARER=false node "${REPO_ROOT}/soul-memory/server.mjs" >"${TOTO_LOG}" 2>&1 &
+  MCP_PROFILE=toto PORT=18791 SUPABASE_BASE_URL="${SUPABASE_BASE_URL_FOR_LOCAL}" MCP_REQUIRE_BEARER=false node "${REPO_ROOT}/marsnme-supabase/server.mjs" >"${TOTO_LOG}" 2>&1 &
   TOTO_PID="$!"
   sleep 2
 fi
@@ -261,7 +261,7 @@ if [[ -z "${OUTPUT_PATH}" ]]; then
 fi
 
 COMMIT_HASH="$(git -C "${REPO_ROOT}" rev-parse HEAD)"
-LOCAL_SERVER_SHA256="$(shasum -a 256 "${REPO_ROOT}/soul-memory/server.mjs" | awk '{print $1}')"
+LOCAL_SERVER_SHA256="$(shasum -a 256 "${REPO_ROOT}/marsnme-supabase/server.mjs" | awk '{print $1}')"
 
 if [[ -n "${REMOTE_SERVER_SHA256}" ]]; then
   REMOTE_SERVER_SHA256_VALUE="\"${REMOTE_SERVER_SHA256}\""

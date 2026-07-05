@@ -84,15 +84,13 @@ Most AI memory tools help AI remember you. **MarsNMe helps you and your AI remem
 - You only need single-session context (just use the system prompt)
 - You want fully managed, zero-config memory with no setup (try a hosted solution)
 
-## Runtime packages (folder map)
+## Runtime packages
 
-Two MCP runtimes live in this repo. **Folder rename to `marsnme-supabase/` and `marsnme-cf/` is planned**; until then, use this table.
-
-| Current folder | Planned name | Runtime | Who uses it |
-|---|---|---|---|
-| `soul-memory/` | `marsnme-supabase/` | Supabase + Jina gateway (`@marsnme/mcp-gateway`) | **Mars Group dogfood** — Proxmox CT101 (CoCo / Toto soul memory) |
-| `marsnme-local/` | `marsnme-cf/` | Cloudflare Workers + D1 + Vectorize | Self-host template; **not** the Proxmox deploy path |
-| `soul-memory/cloudflare-routing-worker/` | (stays under supabase package) | `mcp.marsnme.com` routing proxy | Public setup wizard → upstream gateway |
+| Folder | Runtime | Who uses it |
+|---|---|---|
+| `marsnme-supabase/` | Supabase + Jina gateway (`@marsnme/mcp-gateway`) | **Mars Group dogfood** — Proxmox CT101 (CoCo / Toto soul memory) |
+| `marsnme-cf/` | Cloudflare Workers + D1 + Vectorize | Self-host template; **not** the Proxmox deploy path |
+| `marsnme-supabase/cloudflare-routing-worker/` | `mcp.marsnme.com` routing proxy | Public setup wizard → upstream gateway |
 
 **Product split (Mars Group):** Idea / PRD / task execution → [Draft](https://github.com/Marsmanleo/draft-ai) + `draft-mcp`. **MarsNMe Supabase = CoCo soul memory only** (recall, session boot/close, ingest, lifecycle).
 
@@ -102,9 +100,9 @@ Two MCP runtimes live in this repo. **Folder rename to `marsnme-supabase/` and `
 
 | Package | Description |
 |---|---|
-| `soul-memory/` | Core MCP gateway — agent-agnostic memory backend (this package is published to npm as `@marsnme/mcp-gateway`) |
-| `soul-memory/cloudflare-routing-worker/` | Cloudflare Worker for `mcp.marsnme.com` — username-based MCP routing proxy with setup wizard |
-| `marsnme-local/` | Self-hosted MCP memory server on Cloudflare Workers + D1 + Vectorize (no Supabase needed) |
+| `marsnme-supabase/` | Core MCP gateway — agent-agnostic memory backend (this package is published to npm as `@marsnme/mcp-gateway`) |
+| `marsnme-supabase/cloudflare-routing-worker/` | Cloudflare Worker for `mcp.marsnme.com` — username-based MCP routing proxy with setup wizard |
+| `marsnme-cf/` | Self-hosted MCP memory server on Cloudflare Workers + D1 + Vectorize (no Supabase needed) |
 
 ## Quick Setup (no install needed)
 
@@ -117,7 +115,7 @@ Go to **[mcp.marsnme.com/setup](https://mcp.marsnme.com/setup)** — create your
 
 Then add it to any MCP client (Claude, Cursor, Perplexity, Warp).
 
-**Self-hosted?** Deploy [`marsnme-local/`](marsnme-local/) to your own Cloudflare account — no Supabase needed, uses D1 + Workers AI + Vectorize.
+**Self-hosted?** Deploy [`marsnme-cf/`](marsnme-cf/) to your own Cloudflare account — no Supabase needed, uses D1 + Workers AI + Vectorize.
 
 ---
 
@@ -258,7 +256,7 @@ If bearer auth is enabled (`MCP_REQUIRE_BEARER=true`), include:
 ```json
 {
   "mcpServers": {
-    "marsnme-local": {
+    "marsnme-cf": {
       "url": "http://127.0.0.1:18790/mcp"
     }
   }
@@ -269,7 +267,7 @@ If bearer auth is enabled (`MCP_REQUIRE_BEARER=true`), include:
 ### Cursor
 1. Open Cursor Settings and search for MCP.
 2. Add a new server:
-   - Name: `marsnme-local`
+   - Name: `marsnme-cf`
    - URL: `http://127.0.0.1:18790/mcp`
    - Headers: optional bearer header if enabled
 3. Reconnect MCP in Cursor.
@@ -290,7 +288,7 @@ If bearer auth is enabled (`MCP_REQUIRE_BEARER=true`), include:
 Use a streamable HTTP/SSE MCP entry:
 ```json
 {
-  "marsnme-local": {
+  "marsnme-cf": {
     "url": "http://127.0.0.1:18790/mcp"
   }
 }
@@ -320,7 +318,7 @@ curl -sS http://127.0.0.1:18790/mcp \
 
 ## What this repository is
 `mars-memory-mcp` is the core MCP gateway repository behind the public-facing MarsNMe release.  
-One codebase (`soul-memory/server.mjs`) serves multiple profile schemas through `MCP_PROFILE`.
+One codebase (`marsnme-supabase/server.mjs`) serves multiple profile schemas through `MCP_PROFILE`.
 This public repository currently keeps two built-in legacy profile IDs (`coco`, `toto`) for backward compatibility.
 
 ## Current capabilities
@@ -346,12 +344,12 @@ This public repository currently keeps two built-in legacy profile IDs (`coco`, 
   - Promote durable insights through ingest tools
 
 ## Repository layout
-- `soul-memory/server.mjs` — gateway entry point
-- `soul-memory/scripts/hermes_digest_runner.py` — optional digest runner
-- `soul-memory/scripts/dream_runner.py` — public self-host dream runner
-- `soul-memory/deploy/systemd/` — systemd templates
-- `soul-memory/deploy/phase2/` — build/deploy scripts
-- `soul-memory/deploy/phase3/smoke_gate.sh` — smoke gate script
+- `marsnme-supabase/server.mjs` — gateway entry point
+- `marsnme-supabase/scripts/hermes_digest_runner.py` — optional digest runner
+- `marsnme-supabase/scripts/dream_runner.py` — public self-host dream runner
+- `marsnme-supabase/deploy/systemd/` — systemd templates
+- `marsnme-supabase/deploy/phase2/` — build/deploy scripts
+- `marsnme-supabase/deploy/phase3/smoke_gate.sh` — smoke gate script
 - `supabase/migrations/` — schema-as-code migrations
 
 ## Environment setup
@@ -384,7 +382,7 @@ Dream Runner is public-friendly and can run without Hermes private environment:
 
 Quick start:
 ```bash
-DREAM_ENABLED=true DREAM_MODE=lite python3 soul-memory/scripts/dream_runner.py
+DREAM_ENABLED=true DREAM_MODE=lite python3 marsnme-supabase/scripts/dream_runner.py
 ```
 If you run this repository with bundled defaults and no profile remapping, use `coco` and `toto`.
 
@@ -413,7 +411,7 @@ Health endpoints:
 - `POST /mcp`
 
 ## Systemd deployment
-Use `soul-memory/deploy/systemd/memory-mcp-gateway@.service` with instances:
+Use `marsnme-supabase/deploy/systemd/memory-mcp-gateway@.service` with instances:
 - `memory-mcp-gateway@profile-a.service`
 - `memory-mcp-gateway@profile-b.service`
 
@@ -425,7 +423,7 @@ Recommended env files:
 ## Release/deploy scripts
 1. Build artifact:
 ```bash
-bash soul-memory/deploy/phase2/build_release_artifact.sh
+bash marsnme-supabase/deploy/phase2/build_release_artifact.sh
 ```
 2. Apply migrations with an explicit DDL-capable role:
 ```bash
@@ -433,7 +431,7 @@ npx supabase db push --db-url "<postgres://supabase_admin:<password>@<host>:5432
 ```
 3. Run pre-deploy schema gate (must pass before any service restart):
 ```bash
-bash soul-memory/deploy/phase2/pre_deploy_schema_gate.sh \
+bash marsnme-supabase/deploy/phase2/pre_deploy_schema_gate.sh \
   --db-url "<postgres://supabase_admin:<password>@<host>:5432/postgres>" \
   --profiles coco,toto \
   --expected-role supabase_admin
@@ -443,12 +441,12 @@ bash soul-memory/deploy/phase2/pre_deploy_schema_gate.sh \
    - If schema gate exits non-zero, stop deployment and do not restart services.
 5. Smoke gate:
 ```bash
-bash soul-memory/deploy/phase3/smoke_gate.sh --spawn-local
+bash marsnme-supabase/deploy/phase3/smoke_gate.sh --spawn-local
 ```
 6. Automated npm + MCP Registry release (tag-driven):
    - Workflow: `.github/workflows/publish-release.yml`
    - Trigger: push tag `v*`
-   - Gate: tag version must match `soul-memory/package.json` version
+   - Gate: tag version must match `marsnme-supabase/package.json` version
    - Optional local Fish helper:
 ```bash
 mrel patch
@@ -456,7 +454,7 @@ mrel minor
 mrel major
 mrel 0.1.2
 ```
-   The helper updates `soul-memory/package.json` and `server.json`, commits, tags, and pushes.
+   The helper updates `marsnme-supabase/package.json` and `server.json`, commits, tags, and pushes.
 
 ## Security and version control
 - Never commit `.env`, runtime tokens, or `oauth-clients.json`

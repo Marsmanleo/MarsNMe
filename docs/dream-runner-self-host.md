@@ -1,5 +1,5 @@
 # Dream Runner (Self-Host)
-`soul-memory/scripts/dream_runner.py` is a public self-host digest runner.  
+`marsnme-supabase/scripts/dream_runner.py` is a public self-host digest runner.  
 It periodically collects short-term memory and semantic memory (with optional issue/repo/context providers), synthesizes a digest, then writes it back through `dream_ingest`.
 
 ## 1) Quick start (Lite mode)
@@ -16,7 +16,7 @@ Example:
 DREAM_ENABLED=true \
 DREAM_MODE=lite \
 DREAM_DIGEST_MCP_URL=http://127.0.0.1:18790/mcp \
-python3 soul-memory/scripts/dream_runner.py
+python3 marsnme-supabase/scripts/dream_runner.py
 ```
 
 ## 2) Standard mode

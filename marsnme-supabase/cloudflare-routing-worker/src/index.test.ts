@@ -313,7 +313,7 @@ describe("routing worker", () => {
       body: JSON.stringify({
         username: "leo-d1",
         type: "d1",
-        upstream_mcp_url: "https://marsnme-local.leo.workers.dev"
+        upstream_mcp_url: "https://marsnme-cf.leo.workers.dev"
       })
     });
 
@@ -327,7 +327,7 @@ describe("routing worker", () => {
     expect(savedRaw).toBeTruthy();
     const saved = JSON.parse(savedRaw || "{}") as RouteRecord;
     expect(saved.route_type).toBe("d1");
-    expect(saved.upstream_mcp_url).toBe("https://marsnme-local.leo.workers.dev");
+    expect(saved.upstream_mcp_url).toBe("https://marsnme-cf.leo.workers.dev");
     expect(saved.auth_mode).toBe("passthrough");
     expect(saved.enabled).toBe(true);
   });
@@ -380,7 +380,7 @@ describe("routing worker", () => {
     const kv = new FakeKV();
     kv.setRaw("leo-d1", {
       route_type: "d1",
-      upstream_mcp_url: "https://marsnme-local.leo.workers.dev",
+      upstream_mcp_url: "https://marsnme-cf.leo.workers.dev",
       auth_mode: "passthrough",
       enabled: true
     });
@@ -409,7 +409,7 @@ describe("routing worker", () => {
 
     expect(fetchMock).toHaveBeenCalledOnce();
     const forwarded = fetchMock.mock.calls[0]?.[0] as Request;
-    expect(forwarded.url).toBe("https://marsnme-local.leo.workers.dev/mcp?x=1");
+    expect(forwarded.url).toBe("https://marsnme-cf.leo.workers.dev/mcp?x=1");
     expect(forwarded.headers.get("authorization")).toBe("Bearer test-token");
     expect(forwarded.headers.get("x-marsnme-username")).toBe("leo-d1");
   });

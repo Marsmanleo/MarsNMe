@@ -565,10 +565,10 @@ function setupHtml(host: string): string {
         modeSupabase: "Supabase",
         modeD1: "Cloudflare D1 (自託管)",
         d1Step1: "1. 喺自己嘅 Cloudflare 賬號 deploy MarsNMe Local",
-        d1Step2: "2. 複製 worker URL（如 https://marsnme-local.your-name.workers.dev）",
+        d1Step2: "2. 複製 worker URL（如 https://marsnme-cf.your-name.workers.dev）",
         d1Step3: "3. 貼到下面，完成註冊",
         d1Url: "D1 Worker URL",
-        d1Hint: "URL 應該係類似：https://marsnme-local.your-name.workers.dev"
+        d1Hint: "URL 應該係類似：https://marsnme-cf.your-name.workers.dev"
       },
       en: {
         title: "MarsNMe Setup Wizard",
@@ -607,10 +607,10 @@ function setupHtml(host: string): string {
         modeSupabase: "Supabase",
         modeD1: "Cloudflare D1 (Self-Hosted)",
         d1Step1: "1. Deploy MarsNMe Local to your Cloudflare account",
-        d1Step2: "2. Copy your worker URL (e.g. https://marsnme-local.your-name.workers.dev)",
+        d1Step2: "2. Copy your worker URL (e.g. https://marsnme-cf.your-name.workers.dev)",
         d1Step3: "3. Paste it below to complete registration",
         d1Url: "D1 Worker URL",
-        d1Hint: "URL should look like: https://marsnme-local.your-name.workers.dev"
+        d1Hint: "URL should look like: https://marsnme-cf.your-name.workers.dev"
       }
     };
     const byId = (id) => document.getElementById(id);

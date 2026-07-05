@@ -1,5 +1,5 @@
 -- MarsNMe Local — D1 Schema
--- Run: wrangler d1 execute marsnme-local-db --file=db/schema.sql
+-- Run: wrangler d1 execute marsnme-cf-db --file=db/schema.sql
 
 -- Memories table: short-term session memories (7-day expiry)
 CREATE TABLE IF NOT EXISTS memories (

@@ -4,7 +4,7 @@ Routing-layer worker for `mcp.marsnme.com/{username}` — username-based MCP rev
 
 ## Scope
 
-This worker handles username routing, reverse proxy, and the registration setup page. It does not implement MCP tool logic itself — it forwards requests to upstream MCP servers (Supabase-hosted or self-hosted via [marsnme-local](../../marsnme-local/)).
+This worker handles username routing, reverse proxy, and the registration setup page. It does not implement MCP tool logic itself — it forwards requests to upstream MCP servers (Supabase-hosted or self-hosted via [marsnme-cf](../../marsnme-cf/)).
 
 ## KV schema
 
@@ -132,8 +132,8 @@ JSON report output:
 
 | Package | Description |
 |---|---|
-| `soul-memory/` | Core MCP gateway — the server this worker routes to |
-| `marsnme-local/` | Self-hosted MCP memory server on Cloudflare D1 + Vectorize (D1 mode upstream) |
+| `marsnme-supabase/` | Core MCP gateway — the server this worker routes to |
+| `marsnme-cf/` | Self-hosted MCP memory server on Cloudflare D1 + Vectorize (D1 mode upstream) |
 
 ## License
 

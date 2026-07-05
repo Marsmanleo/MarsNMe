@@ -51,7 +51,7 @@ Option B (Supabase Dashboard SQL Editor):
 ## 3.5) Pre-deploy schema compatibility gate (recommended for CI/CD upgrades)
 Run this gate before any service restart during upgrades:
 ```bash
-bash soul-memory/deploy/phase2/pre_deploy_schema_gate.sh \
+bash marsnme-supabase/deploy/phase2/pre_deploy_schema_gate.sh \
   --db-url "<postgres://supabase_admin:<password>@<host>:5432/postgres>" \
   --profiles profile-a \
   --expected-role supabase_admin

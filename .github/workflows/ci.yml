@@ -29,7 +29,7 @@ jobs:
           node-version: 20
 
       - name: Install Node dependencies (if any)
-        run: pnpm --dir soul-memory install --ignore-scripts --no-frozen-lockfile
+        run: pnpm --dir marsnme-supabase install --ignore-scripts --no-frozen-lockfile
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -37,12 +37,12 @@ jobs:
           python-version: "3.11"
 
       - name: Node syntax check
-        run: node --check soul-memory/server.mjs
+        run: node --check marsnme-supabase/server.mjs
 
       - name: Python unit tests
-        run: python3 soul-memory/scripts/tests/test_dream_runner_modes.py
+        run: python3 marsnme-supabase/scripts/tests/test_dream_runner_modes.py
 
       - name: Shell script syntax check
         run: |
-          bash -n soul-memory/deploy/phase2/pre_deploy_schema_gate.sh
-          bash -n soul-memory/deploy/phase3/smoke_gate.sh
+          bash -n marsnme-supabase/deploy/phase2/pre_deploy_schema_gate.sh
+          bash -n marsnme-supabase/deploy/phase3/smoke_gate.sh

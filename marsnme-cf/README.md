@@ -17,7 +17,7 @@ No external dependencies beyond your own Cloudflare account. Your data stays in 
 ### 1. Create D1 Database
 
 ```bash
-wrangler d1 create marsnme-local-db
+wrangler d1 create marsnme-cf-db
 ```
 
 Copy the `database_id` from output.
@@ -25,25 +25,25 @@ Copy the `database_id` from output.
 ### 2. Create Vectorize Index
 
 ```bash
-wrangler vectorize create marsnme-local-vectors --dimensions=768 --metric=cosine
+wrangler vectorize create marsnme-cf-vectors --dimensions=768 --metric=cosine
 ```
 
 ### 3. Configure `wrangler.toml`
 
 ```toml
-name = "marsnme-local"
+name = "marsnme-cf"
 main = "src/index.ts"
 compatibility_date = "2024-11-01"
 compatibility_flags = ["nodejs_compat"]
 
 [[d1_databases]]
 binding = "DB"
-database_name = "marsnme-local-db"
+database_name = "marsnme-cf-db"
 database_id = "YOUR_DATABASE_ID_HERE"
 
 [[vectorize]]
 binding = "VECTORIZE"
-index_name = "marsnme-local-vectors"
+index_name = "marsnme-cf-vectors"
 dimensions = 768
 metric = "cosine"
 
@@ -54,7 +54,7 @@ binding = "AI"
 ### 4. Run Schema Migration
 
 ```bash
-wrangler d1 execute marsnme-local-db --remote --file=db/schema.sql
+wrangler d1 execute marsnme-cf-db --remote --file=db/schema.sql
 ```
 
 ### 5. Deploy
@@ -63,19 +63,19 @@ wrangler d1 execute marsnme-local-db --remote --file=db/schema.sql
 wrangler deploy
 ```
 
-Your worker URL: `https://marsnme-local.YOUR_SUBDOMAIN.workers.dev`
+Your worker URL: `https://marsnme-cf.YOUR_SUBDOMAIN.workers.dev`
 
 ### 6. Test Health Check
 
 ```bash
-curl https://marsnme-local.YOUR_SUBDOMAIN.workers.dev/health
+curl https://marsnme-cf.YOUR_SUBDOMAIN.workers.dev/health
 ```
 
 Expected:
 ```json
 {
   "ok": true,
-  "service": "marsnme-local",
+  "service": "marsnme-cf",
   "version": "0.1.0",
   "profile": "coco",
   "timestamp": "2026-06-06T...",
