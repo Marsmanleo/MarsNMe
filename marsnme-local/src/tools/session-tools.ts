@@ -31,10 +31,11 @@ export function registerSessionBoot(server: McpServer, profile: string, env: Env
       // 2. Fetch recent insights
       const recentInsights = await listInsights(env, profile, 10);
 
-      // 3. If topic provided, do semantic recall
+      // 3. Semantic recall — use provided topic, or auto-derive from most recent insight
       let topicRecalls: string[] = [];
-      if (topic) {
-        const embedding = await embed(topic, env);
+      const effectiveTopic = topic ?? recentInsights[0]?.content?.slice(0, 200);
+      if (effectiveTopic) {
+        const embedding = await embed(effectiveTopic, env);
         const matches = await queryVectors(env, embedding, {
           topK: limit,
           profile,
@@ -67,9 +68,9 @@ export function registerSessionBoot(server: McpServer, profile: string, env: Env
       parts.push(``);
       parts.push(`Recent memories: ${recentMemories.length}`);
       parts.push(`Recent insights: ${recentInsights.length}`);
-      if (topic) {
+      if (effectiveTopic) {
         parts.push(``);
-        parts.push(`Topic recalls for "${topic}": ${topicRecalls.length}`);
+        parts.push(`Topic recalls for "${effectiveTopic.slice(0, 60)}": ${topicRecalls.length}`);
         if (topicRecalls.length > 0) {
           parts.push(``);
           parts.push("--- Topic Recalls ---");
