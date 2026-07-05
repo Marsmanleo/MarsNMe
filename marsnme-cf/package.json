@@ -6,17 +6,17 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/Marsmanleo/MarsNMe.git",
-    "directory": "marsnme-local"
+    "directory": "marsnme-cf"
   },
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
-    "db:create": "wrangler d1 create marsnme-local-db",
-    "db:migrate": "wrangler d1 execute marsnme-local-db --file=db/schema.sql",
-    "db:migrate:remote": "wrangler d1 execute marsnme-local-db --remote --file=db/schema.sql",
-    "vectors:create": "wrangler vectorize create marsnme-local-vectors --dimensions=768 --metric=cosine",
+    "db:create": "wrangler d1 create marsnme-cf-db",
+    "db:migrate": "wrangler d1 execute marsnme-cf-db --file=db/schema.sql",
+    "db:migrate:remote": "wrangler d1 execute marsnme-cf-db --remote --file=db/schema.sql",
+    "vectors:create": "wrangler vectorize create marsnme-cf-vectors --dimensions=768 --metric=cosine",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

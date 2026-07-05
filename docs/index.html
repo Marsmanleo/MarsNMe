@@ -458,7 +458,7 @@ footer a:hover{color:var(--color-text);}
           <span class="step-num">05</span>
           <div class="step-content">
             <h3>Cloud Hosted or Self-Hosted</h3>
-            <p>Use <code style="font-family:var(--font-mono);color:var(--color-accent);font-size:0.9em;">mcp.marsnme.com/your-name</code> for zero-config cloud routing, or deploy <code style="font-family:var(--font-mono);color:var(--color-accent);font-size:0.9em;">marsnme-local</code> to your own Cloudflare account for full self-hosting with D1 + Vectorize.</p>
+            <p>Use <code style="font-family:var(--font-mono);color:var(--color-accent);font-size:0.9em;">mcp.marsnme.com/your-name</code> for zero-config cloud routing, or deploy <code style="font-family:var(--font-mono);color:var(--color-accent);font-size:0.9em;">marsnme-cf</code> to your own Cloudflare account for full self-hosting with D1 + Vectorize.</p>
           </div>
         </div>
       </div>
@@ -728,13 +728,13 @@ URL: http://127.0.0.1:18790/mcp</span></pre>
 <span style="color:var(--color-text-faint)"># → Get: https://mcp.marsnme.com/your-name</span>
 
 <span class="code-comment"># Option B: Self-hosted on Cloudflare (full control)</span>
-<span style="color:var(--color-accent)">$</span> <span style="color:var(--color-text)">cd marsnme-local</span>
+<span style="color:var(--color-accent)">$</span> <span style="color:var(--color-text)">cd marsnme-cf</span>
 <span style="color:var(--color-accent)">$</span> <span style="color:var(--color-text)">npm install</span>
-<span style="color:var(--color-accent)">$</span> <span style="color:var(--color-text)">wrangler d1 create marsnme-local-db</span>
-<span style="color:var(--color-accent)">$</span> <span style="color:var(--color-text)">wrangler d1 execute marsnme-local-db --file=db/schema.sql</span>
-<span style="color:var(--color-accent)">$</span> <span style="color:var(--color-text)">wrangler vectorize create marsnme-local-vectors --dimensions=768 --metric=cosine</span>
+<span style="color:var(--color-accent)">$</span> <span style="color:var(--color-text)">wrangler d1 create marsnme-cf-db</span>
+<span style="color:var(--color-accent)">$</span> <span style="color:var(--color-text)">wrangler d1 execute marsnme-cf-db --file=db/schema.sql</span>
+<span style="color:var(--color-accent)">$</span> <span style="color:var(--color-text)">wrangler vectorize create marsnme-cf-vectors --dimensions=768 --metric=cosine</span>
 <span style="color:var(--color-accent)">$</span> <span style="color:var(--text)">wrangler deploy</span>
-<span style="color:var(--color-green)"># your MCP endpoint: https://marsnme-local.your-name.workers.dev</span></pre>
+<span style="color:var(--color-green)"># your MCP endpoint: https://marsnme-cf.your-name.workers.dev</span></pre>
             </div>
             <div class="install-note">
               <strong>Cloud hosted:</strong> No infrastructure needed. Supabase + our routing worker handles everything.<br>

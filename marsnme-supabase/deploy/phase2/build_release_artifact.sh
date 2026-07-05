@@ -31,15 +31,15 @@ ARTIFACT_PATH="${OUTPUT_DIR}/${ARTIFACT_BASENAME}.tar.gz"
 MANIFEST_PATH="${OUTPUT_DIR}/${ARTIFACT_BASENAME}.manifest.json"
 
 tar -C "${REPO_ROOT}" -czf "${ARTIFACT_PATH}" \
-  --exclude='soul-memory/deploy/artifacts' \
-  --exclude='soul-memory/deploy/phase0/ct101-baseline-*' \
+  --exclude='marsnme-supabase/deploy/artifacts' \
+  --exclude='marsnme-supabase/deploy/phase0/ct101-baseline-*' \
   README.md \
-  soul-memory \
+  marsnme-supabase \
   supabase/config.toml \
   supabase/migrations
 
 ARTIFACT_SHA256="$(shasum -a 256 "${ARTIFACT_PATH}" | awk '{print $1}')"
-SERVER_SHA256="$(shasum -a 256 "${REPO_ROOT}/soul-memory/server.mjs" | awk '{print $1}')"
+SERVER_SHA256="$(shasum -a 256 "${REPO_ROOT}/marsnme-supabase/server.mjs" | awk '{print $1}')"
 
 cat > "${MANIFEST_PATH}" <<EOF
 {
@@ -47,7 +47,7 @@ cat > "${MANIFEST_PATH}" <<EOF
   "commit_hash": "${COMMIT_HASH}",
   "artifact_path": "${ARTIFACT_PATH}",
   "artifact_sha256": "${ARTIFACT_SHA256}",
-  "server_path": "soul-memory/server.mjs",
+  "server_path": "marsnme-supabase/server.mjs",
   "server_sha256": "${SERVER_SHA256}"
 }
 EOF

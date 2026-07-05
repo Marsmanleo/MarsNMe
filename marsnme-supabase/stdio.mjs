@@ -2,7 +2,7 @@
 /**
  * stdio.mjs — stdio→HTTP bridge for Glama/mcp-proxy
  *
- * Glama's Dockerfile uses: mcp-proxy -- node soul-memory/stdio.mjs
+ * Glama's Dockerfile uses: mcp-proxy -- node marsnme-supabase/stdio.mjs
  * mcp-proxy sends JSON-RPC via stdin, expects JSON-RPC on stdout.
  *
  * This file:
@@ -21,7 +21,7 @@ const HOST = '127.0.0.1';
 const MCP_PATH = '/mcp';
 
 // ── Start HTTP server as child process ──
-const child = spawn('node', ['soul-memory/server.mjs'], {
+const child = spawn('node', ['marsnme-supabase/server.mjs'], {
   env: { ...process.env, PORT: String(PORT) },
   stdio: ['ignore', 'pipe', 'pipe'],
 });

@@ -52,7 +52,7 @@ async function initializeDatabase(_env: Env): Promise<void> {
 // ─── MCP Server Builder ───────────────────────────────────────────────────────
 
 function buildMcpServer(profile: string, env: Env, _ctx: ExecutionContext): McpServer {
-  const server = new McpServer({ name: "marsnme-local", version: "0.1.0" });
+  const server = new McpServer({ name: "marsnme-cf", version: "0.1.0" });
 
   // Memory tools
   registerInsertMemory(server, profile, env);
@@ -95,7 +95,7 @@ export default {
     if (url.pathname === "/health" && request.method === "GET") {
       const health = {
         ok: true,
-        service: "marsnme-local",
+        service: "marsnme-cf",
         version: VERSION,
         profile,
         timestamp: new Date().toISOString(),

@@ -86,9 +86,9 @@ curl -fsSL https://marsnme.com/install.sh | bash
 
 | 套件 | 說明 |
 |---|---|
-| `soul-memory/` | 核心 MCP 閘道——與代理無關的記憶後端（此套件以 `@marsnme/mcp-gateway` 發佈至 npm） |
-| `soul-memory/cloudflare-routing-worker/` | `mcp.marsnme.com` 的 Cloudflare Worker——基於使用者名稱的 MCP 路由代理，含設定精靈 |
-| `marsnme-local/` | 自架式 MCP 記憶伺服器，運行在 Cloudflare Workers + D1 + Vectorize（不需要 Supabase） |
+| `marsnme-supabase/` | 核心 MCP 閘道——與代理無關的記憶後端（此套件以 `@marsnme/mcp-gateway` 發佈至 npm） |
+| `marsnme-supabase/cloudflare-routing-worker/` | `mcp.marsnme.com` 的 Cloudflare Worker——基於使用者名稱的 MCP 路由代理，含設定精靈 |
+| `marsnme-cf/` | 自架式 MCP 記憶伺服器，運行在 Cloudflare Workers + D1 + Vectorize（不需要 Supabase） |
 
 ## 快速設定（免安裝）
 
@@ -101,7 +101,7 @@ curl -fsSL https://marsnme.com/install.sh | bash
 
 然後將它加入任何 MCP 客戶端（Claude、Cursor、Perplexity、Warp）。
 
-**想要自架？** 將 [`marsnme-local/`](marsnme-local/) 部署到你自己的 Cloudflare 帳號——不需要 Supabase，使用 D1 + Workers AI + Vectorize。
+**想要自架？** 將 [`marsnme-cf/`](marsnme-cf/) 部署到你自己的 Cloudflare 帳號——不需要 Supabase，使用 D1 + Workers AI + Vectorize。
 
 ---
 
@@ -242,7 +242,7 @@ docker compose --profile tunnel logs tunnel | grep -Eo 'https://[^ ]+trycloudfla
 ```json
 {
   "mcpServers": {
-    "marsnme-local": {
+    "marsnme-cf": {
       "url": "http://127.0.0.1:18790/mcp"
     }
   }
@@ -253,7 +253,7 @@ docker compose --profile tunnel logs tunnel | grep -Eo 'https://[^ ]+trycloudfla
 ### Cursor
 1. 開啟 Cursor 設定並搜尋 MCP。
 2. 新增伺服器：
-   - 名稱：`marsnme-local`
+   - 名稱：`marsnme-cf`
    - URL：`http://127.0.0.1:18790/mcp`
    - Headers：如果啟用了 bearer 可選加入
 3. 在 Cursor 中重新連接 MCP。
@@ -274,7 +274,7 @@ docker compose --profile tunnel logs tunnel | grep -Eo 'https://[^ ]+trycloudfla
 使用 streamable HTTP/SSE MCP 設定：
 ```json
 {
-  "marsnme-local": {
+  "marsnme-cf": {
     "url": "http://127.0.0.1:18790/mcp"
   }
 }
@@ -304,7 +304,7 @@ curl -sS http://127.0.0.1:18790/mcp \
 
 ## 這個儲存庫是什麼
 `mars-memory-mcp` 是公開 MarsNMe 發行版背後的核心 MCP 閘道儲存庫。
-一個程式碼庫（`soul-memory/server.mjs`）透過 `MCP_PROFILE` 服務多個設定檔 schema。
+一個程式碼庫（`marsnme-supabase/server.mjs`）透過 `MCP_PROFILE` 服務多個設定檔 schema。
 此公開儲存庫目前保留兩個內建舊版設定檔 ID（`coco`、`toto`）以保持向下相容。
 
 ## 目前功能
@@ -330,12 +330,12 @@ curl -sS http://127.0.0.1:18790/mcp \
   - 透過匯入工具提升持久洞察
 
 ## 儲存庫結構
-- `soul-memory/server.mjs` — 閘道入口點
-- `soul-memory/scripts/hermes_digest_runner.py` — 選用的摘要執行器
-- `soul-memory/scripts/dream_runner.py` — 公開自架 dream runner
-- `soul-memory/deploy/systemd/` — systemd 範本
-- `soul-memory/deploy/phase2/` — 建置/部署腳本
-- `soul-memory/deploy/phase3/smoke_gate.sh` — 冒煙測試腳本
+- `marsnme-supabase/server.mjs` — 閘道入口點
+- `marsnme-supabase/scripts/hermes_digest_runner.py` — 選用的摘要執行器
+- `marsnme-supabase/scripts/dream_runner.py` — 公開自架 dream runner
+- `marsnme-supabase/deploy/systemd/` — systemd 範本
+- `marsnme-supabase/deploy/phase2/` — 建置/部署腳本
+- `marsnme-supabase/deploy/phase3/smoke_gate.sh` — 冒煙測試腳本
 - `supabase/migrations/` — schema 即程式碼遷移
 
 ## 環境設定
@@ -368,7 +368,7 @@ Dream Runner 是公開友善的，可以在沒有 Hermes 私有環境的情況�
 
 快速開始：
 ```bash
-DREAM_ENABLED=true DREAM_MODE=lite python3 soul-memory/scripts/dream_runner.py
+DREAM_ENABLED=true DREAM_MODE=lite python3 marsnme-supabase/scripts/dream_runner.py
 ```
 如果你使用此儲存庫的預設值且未重新對應設定檔，請使用 `coco` 和 `toto`。
 
@@ -397,7 +397,7 @@ MCP_PROFILE=profile-b npx @marsnme/mcp-gateway
 - `POST /mcp`
 
 ## Systemd 部署
-使用 `soul-memory/deploy/systemd/memory-mcp-gateway@.service` 搭配實例：
+使用 `marsnme-supabase/deploy/systemd/memory-mcp-gateway@.service` 搭配實例：
 - `memory-mcp-gateway@profile-a.service`
 - `memory-mcp-gateway@profile-b.service`
 
@@ -409,7 +409,7 @@ MCP_PROFILE=profile-b npx @marsnme/mcp-gateway
 ## 發行/部署腳本
 1. 建置產物：
 ```bash
-bash soul-memory/deploy/phase2/build_release_artifact.sh
+bash marsnme-supabase/deploy/phase2/build_release_artifact.sh
 ```
 2. 使用明確的 DDL 角色套用遷移：
 ```bash
@@ -417,7 +417,7 @@ npx supabase db push --db-url "<postgres://supabase_admin:<password>@<host>:5432
 ```
 3. 執行部署前 schema 閘道（在任何服務重啟前必須通過）：
 ```bash
-bash soul-memory/deploy/phase2/pre_deploy_schema_gate.sh \
+bash marsnme-supabase/deploy/phase2/pre_deploy_schema_gate.sh \
   --db-url "<postgres://supabase_admin:<password>@<host>:5432/postgres>" \
   --profiles coco,toto \
   --expected-role supabase_admin
@@ -427,12 +427,12 @@ bash soul-memory/deploy/phase2/pre_deploy_schema_gate.sh \
    - 如果 schema 閘道回傳非零值，停止部署且不要重啟服務。
 5. 冒煙測試閘道：
 ```bash
-bash soul-memory/deploy/phase3/smoke_gate.sh --spawn-local
+bash marsnme-supabase/deploy/phase3/smoke_gate.sh --spawn-local
 ```
 6. 自動化 npm + MCP Registry 發行（標籤驅動）：
    - 工作流程：`.github/workflows/publish-release.yml`
    - 觸發條件：推送標籤 `v*`
-   - 閘道：標籤版本必須與 `soul-memory/package.json` 版本一致
+   - 閘道：標籤版本必須與 `marsnme-supabase/package.json` 版本一致
    - 選用的本地 Fish 輔助指令：
 ```bash
 mrel patch
@@ -440,7 +440,7 @@ mrel minor
 mrel major
 mrel 0.1.2
 ```
-   輔助指令會更新 `soul-memory/package.json` 和 `server.json`，然後提交、標記並推送。
+   輔助指令會更新 `marsnme-supabase/package.json` 和 `server.json`，然後提交、標記並推送。
 
 ## 安全與版本控制
 - 絕對不要提交 `.env`、執行時 token 或 `oauth-clients.json`

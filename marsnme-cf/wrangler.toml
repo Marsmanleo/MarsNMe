@@ -1,4 +1,4 @@
-name = "marsnme-local"
+name = "marsnme-cf"
 main = "src/index.ts"
 compatibility_date = "2024-11-01"
 compatibility_flags = ["nodejs_compat"]
@@ -7,12 +7,12 @@ compatibility_flags = ["nodejs_compat"]
 
 [[d1_databases]]
 binding = "DB"
-database_name = "marsnme-local-db"
+database_name = "marsnme-cf-db"
 database_id = "REPLACE_WITH_YOUR_D1_DATABASE_ID"
 
 [[vectorize]]
 binding = "VECTORIZE"
-index_name = "marsnme-local-vectors"
+index_name = "marsnme-cf-vectors"
 dimensions = 768
 metric = "cosine"
 

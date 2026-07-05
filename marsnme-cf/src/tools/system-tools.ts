@@ -47,7 +47,7 @@ export function registerHealthCheck(server: McpServer, profile: string, env: Env
 
       const status: HealthStatus = {
         ok: dbConnected && vectorizeConnected,
-        service: "marsnme-local",
+        service: "marsnme-cf",
         version: "0.1.0",
         profile,
         db_connected: dbConnected,

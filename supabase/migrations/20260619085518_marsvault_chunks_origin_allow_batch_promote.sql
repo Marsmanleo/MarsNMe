@@ -1,6 +1,6 @@
 -- Add 'batch-promote' origin to coco.marsvault_chunks check constraint
 --
--- Context: The batch_promote MCP tool (soul-memory/server.mjs) inserts
+-- Context: The batch_promote MCP tool (marsnme-supabase/server.mjs) inserts
 -- promoted chunks with origin = 'batch-promote' by default. The existing
 -- marsvault_chunks_origin_check constraint on coco.marsvault_chunks did
 -- not allowlist this value, so every batch_promote insert failed with

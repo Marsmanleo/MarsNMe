@@ -8,8 +8,8 @@ from typing import Optional
 
 
 ROOT = Path(__file__).resolve().parents[3]
-DREAM_RUNNER = ROOT / "soul-memory" / "scripts" / "dream_runner.py"
-HERMES_WRAPPER = ROOT / "soul-memory" / "scripts" / "hermes_digest_runner.py"
+DREAM_RUNNER = ROOT / "marsnme-supabase" / "scripts" / "dream_runner.py"
+HERMES_WRAPPER = ROOT / "marsnme-supabase" / "scripts" / "hermes_digest_runner.py"
 
 
 class DreamRunnerModeTests(unittest.TestCase):

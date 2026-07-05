@@ -11,7 +11,7 @@
 ## Step 1: Create D1 Database
 
 ```bash
-npx wrangler d1 create marsnme-local-db
+npx wrangler d1 create marsnme-cf-db
 ```
 
 Copy the `database_id` from output and paste into `wrangler.toml`:
@@ -19,7 +19,7 @@ Copy the `database_id` from output and paste into `wrangler.toml`:
 ```toml
 [[d1_databases]]
 binding = "DB"
-database_name = "marsnme-local-db"
+database_name = "marsnme-cf-db"
 database_id = "your-database-id-here"
 ```
 
@@ -28,7 +28,7 @@ database_id = "your-database-id-here"
 ## Step 2: Create Vectorize Index
 
 ```bash
-npx wrangler vectorize create marsnme-local-vectors --dimensions=768 --metric=cosine
+npx wrangler vectorize create marsnme-cf-vectors --dimensions=768 --metric=cosine
 ```
 
 ---
@@ -69,7 +69,7 @@ Expected response:
 ```json
 {
   "ok": true,
-  "service": "marsnme-local",
+  "service": "marsnme-cf",
   "profile": "coco"
 }
 ```

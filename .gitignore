@@ -13,10 +13,10 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 *.log
-soul-memory/deploy/phase0/ct101-baseline-*.txt
-soul-memory/deploy/phase0/phase0-artifacts.txt
-soul-memory/deploy/artifacts/*.tar.gz
-soul-memory/deploy/artifacts/*.manifest.json
-soul-memory/deploy/phase3/smoke-report-*.json
+marsnme-supabase/deploy/phase0/ct101-baseline-*.txt
+marsnme-supabase/deploy/phase0/phase0-artifacts.txt
+marsnme-supabase/deploy/artifacts/*.tar.gz
+marsnme-supabase/deploy/artifacts/*.manifest.json
+marsnme-supabase/deploy/phase3/smoke-report-*.json
 .wrangler/
 .playwright-mcp/

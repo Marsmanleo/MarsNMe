@@ -6,19 +6,19 @@ Requires=docker.service
 
 [Service]
 Type=simple
-WorkingDirectory=/opt/mars-memory-mcp/current-%i/soul-memory
+WorkingDirectory=/opt/mars-memory-mcp/current-%i/marsnme-supabase
 EnvironmentFile=-/opt/mars-memory-mcp/shared/.env
 EnvironmentFile=-/opt/mars-memory-mcp/shared/.env.%i
-EnvironmentFile=-/opt/mars-memory-mcp/current-%i/soul-memory/.env
-EnvironmentFile=-/opt/mars-memory-mcp/current-%i/soul-memory/.env.%i
-EnvironmentFile=-/opt/mars-memory-mcp/current/soul-memory/.env
-EnvironmentFile=-/opt/mars-memory-mcp/current/soul-memory/.env.%i
+EnvironmentFile=-/opt/mars-memory-mcp/current-%i/marsnme-supabase/.env
+EnvironmentFile=-/opt/mars-memory-mcp/current-%i/marsnme-supabase/.env.%i
+EnvironmentFile=-/opt/mars-memory-mcp/current/marsnme-supabase/.env
+EnvironmentFile=-/opt/mars-memory-mcp/current/marsnme-supabase/.env.%i
 Environment=MCP_PROFILE=%i
 Environment=MCP_REQUIRE_BEARER=true
 Environment=JINA_EMBEDDING_API_URL=https://api.jina.ai/v1/embeddings
 Environment=JINA_EMBEDDING_MODEL=jina-embeddings-v3
 Environment=JINA_EMBEDDING_DIMENSIONS=1024
-ExecStart=/usr/bin/node /opt/mars-memory-mcp/current-%i/soul-memory/server.mjs
+ExecStart=/usr/bin/node /opt/mars-memory-mcp/current-%i/marsnme-supabase/server.mjs
 Restart=always
 RestartSec=3
 
