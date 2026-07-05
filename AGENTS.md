@@ -10,3 +10,4 @@
 - **Production dogfood = `marsnme-supabase`**, not `marsnme-cf`. Changes merged to `marsnme-cf` (e.g. session_boot) do not deploy to Proxmox via `cd-selfhosted`.
 - **Product scope (Mars Group):** Draft + draft-mcp own idea/PRD/task execution; MarsNMe Supabase = **CoCo soul memory** (recall, session boot/close, ingest, lifecycle). Do not expand PRD tools on the Supabase gateway.
 - **Proxmox deploy (`marsnme-supabase`)**: MarsNMe-lab `./deploy/deploy-proxmox-ct101.sh <profile> [--apply]` or GitHub **`cd-selfhosted`** workflow — not a single-script deploy like draft-mcp.
+- **Tool surface:** Lab dogfood gateway = 14 CoCo memory tools only (no PRD). Public `marsnme-supabase/server.mjs` aligned in v0.2.2 — PRD MCP tools removed; use [Draft](https://github.com/Marsmanleo/draft-ai) for idea/PRD/task execution.

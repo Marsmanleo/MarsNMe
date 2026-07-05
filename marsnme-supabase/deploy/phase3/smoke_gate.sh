@@ -131,7 +131,8 @@ COCO_TOOLS_JSON="$(mcp_jsonrpc "${COCO_URL}" '{"jsonrpc":"2.0","id":"coco-tools-
 TOTO_TOOLS_JSON="$(mcp_jsonrpc "${TOTO_URL}" '{"jsonrpc":"2.0","id":"toto-tools-list","method":"tools/list","params":{}}')"
 
 COCO_TOOLS_CHECK="$(TOOLS_PAYLOAD="${COCO_TOOLS_JSON}" node -e '
-const expected = ["insert_memory", "list_memories", "search_memories", "recall", "health_check", "session_boot", "session_close", "dream_ingest", "memory_ingest"];
+const expected = ["insert_memory", "list_memories", "search_memories", "reload_source_registry", "recall", "health_check", "session_boot", "session_close", "dream_ingest", "memory_ingest", "demote_memory", "soft_forget", "explain_memory", "batch_promote"];
+const prdTools = ["save_prd", "get_prd", "list_prds", "score_prd", "spawn_to_linear"];
 const payload = JSON.parse(process.env.TOOLS_PAYLOAD || "{}");
 if (payload.error) throw new Error("tools/list error: " + JSON.stringify(payload.error));
 const tools = payload.result?.tools;
@@ -139,11 +140,14 @@ if (!Array.isArray(tools)) throw new Error("tools/list missing result.tools");
 const names = tools.map((item) => item?.name).filter(Boolean);
 const missing = expected.filter((name) => !names.includes(name));
 if (missing.length > 0) throw new Error("missing tools: " + missing.join(","));
+const leaked = names.filter((name) => prdTools.includes(name));
+if (leaked.length > 0) throw new Error("PRD tools must not be exposed: " + leaked.join(","));
 process.stdout.write(JSON.stringify({ tool_count: names.length, tools: names }));
 ')"
 
 TOTO_TOOLS_CHECK="$(TOOLS_PAYLOAD="${TOTO_TOOLS_JSON}" node -e '
-const expected = ["insert_memory", "list_memories", "search_memories", "recall", "health_check", "session_boot", "session_close", "dream_ingest", "memory_ingest"];
+const expected = ["insert_memory", "list_memories", "search_memories", "reload_source_registry", "recall", "health_check", "session_boot", "session_close", "dream_ingest", "memory_ingest", "demote_memory", "soft_forget", "explain_memory", "batch_promote"];
+const prdTools = ["save_prd", "get_prd", "list_prds", "score_prd", "spawn_to_linear"];
 const payload = JSON.parse(process.env.TOOLS_PAYLOAD || "{}");
 if (payload.error) throw new Error("tools/list error: " + JSON.stringify(payload.error));
 const tools = payload.result?.tools;
@@ -151,6 +155,8 @@ if (!Array.isArray(tools)) throw new Error("tools/list missing result.tools");
 const names = tools.map((item) => item?.name).filter(Boolean);
 const missing = expected.filter((name) => !names.includes(name));
 if (missing.length > 0) throw new Error("missing tools: " + missing.join(","));
+const leaked = names.filter((name) => prdTools.includes(name));
+if (leaked.length > 0) throw new Error("PRD tools must not be exposed: " + leaked.join(","));
 process.stdout.write(JSON.stringify({ tool_count: names.length, tools: names }));
 ')"
 
