@@ -13,7 +13,7 @@ const PROFILE_CONFIGS = {
     defaultPort: 18790,
     gatewayDir: 'coco-mcp-gateway',
     publicHostSuffix: 'coco-mcp.marsgroup.asia',
-    sourceWhitelist: ['perplexity', 'cursor', 'warp', 'openclaw', 'hermes'],
+    sourceWhitelist: ['perplexity', 'cursor', 'warp', 'openclaw', 'hermes', 'draft'],
     recallBodyEnum: ['coco', 'toto', 'system'],
     digestDefaultOrigin: 'hermes-coco-digest',
     memoryIngestToolName: 'memory_ingest',
@@ -256,7 +256,8 @@ const SOURCE_TO_AGENT_BODY_MAP = new Map([
   ['cursor', 'cursor'],
   ['warp', 'warp'],
   ['openclaw', 'desktop'],
-  ['hermes', 'desktop']
+  ['hermes', 'desktop'],
+  ['draft', 'desktop']
 ]);
 const DEFAULT_AGENT_BODY = String(process.env.MCP_AGENT_BODY || '')
   .trim()
