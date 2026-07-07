@@ -190,9 +190,13 @@ const ANON_ALLOWED_TOOL_NAMES = new Set([
   'search_memories',
   'reload_source_registry',
   'recall',
+  'get_summary',
+  'get_full',
   'health_check',
   'explain_memory'
 ]);
+const RECALL_PREVIEW_MAX_CHARS = 80;
+const CHUNK_SUMMARY_MAX_CHARS = 300;
 const SUPABASE_REQUEST_CONTEXT = new AsyncLocalStorage();
 const OAUTH_ENABLED = process.env.MCP_OAUTH_ENABLED !== 'false';
 const REQUIRE_BEARER = process.env.MCP_REQUIRE_BEARER === 'true';
@@ -387,7 +391,7 @@ function buildTools() {
     },
     {
       name: 'recall',
-      description: `Semantic recall from long-term memory (${DB_PROFILE}.marsvault_chunks) using Jina embeddings. Searches across promoted insights, digests, and archived knowledge using vector similarity. Use this to retrieve established patterns, past decisions, documented workflows, or any knowledge that was previously promoted to long-term storage. This is the primary tool for accessing institutional memory.`,
+      description: `Semantic recall from long-term memory (${DB_PROFILE}.marsvault_chunks) using Jina embeddings. Returns preview snippets (~${RECALL_PREVIEW_MAX_CHARS} chars) per match by default — use get_summary for a longer excerpt or get_full for complete chunk text. Searches promoted insights, digests, and archived knowledge using vector similarity.`,
       inputSchema: {
         type: 'object',
         properties: {
@@ -415,6 +419,30 @@ function buildTools() {
           }
         },
         required: ['query'],
+        additionalProperties: false
+      }
+    },
+    {
+      name: 'get_summary',
+      description: `Fetch a medium-length excerpt (~${CHUNK_SUMMARY_MAX_CHARS} chars) of a long-term memory chunk by ID. Use after recall when a preview match looks relevant. For complete text, call get_full.`,
+      inputSchema: {
+        type: 'object',
+        properties: {
+          id: { type: 'string', description: 'UUID of the marsvault_chunks row' }
+        },
+        required: ['id'],
+        additionalProperties: false
+      }
+    },
+    {
+      name: 'get_full',
+      description: `Fetch the complete text of a long-term memory chunk by ID. Use sparingly after recall/get_summary when you need the full institutional memory entry.`,
+      inputSchema: {
+        type: 'object',
+        properties: {
+          id: { type: 'string', description: 'UUID of the marsvault_chunks row' }
+        },
+        required: ['id'],
         additionalProperties: false
       }
     },
@@ -1385,6 +1413,46 @@ function normalizeOptionalText(value, maxLength = 200) {
   if (!text) return '';
   return text.slice(0, Math.max(1, maxLength));
 }
+
+function truncateChunkContent(text, maxChars) {
+  const raw = String(text ?? '');
+  if (raw.length <= maxChars) {
+    return { content: raw, preview_truncated: false, content_chars: raw.length };
+  }
+  return {
+    content: raw.slice(0, maxChars),
+    preview_truncated: true,
+    content_chars: raw.length
+  };
+}
+
+function applyRecallPreviewToItem(item) {
+  const fullContent = String(item?.content ?? '');
+  const preview = truncateChunkContent(fullContent, RECALL_PREVIEW_MAX_CHARS);
+  return {
+    ...item,
+    content: preview.content,
+    preview_truncated: preview.preview_truncated,
+    content_chars: preview.content_chars
+  };
+}
+
+function buildChunkToolFields(chunk) {
+  return {
+    id: chunk.id,
+    source_file: chunk.source_file || null,
+    section: chunk.section || null,
+    body: chunk.body || null,
+    visibility: chunk.visibility || null,
+    tags: chunk.tags ?? [],
+    type: chunk.type || null,
+    date: chunk.date || null,
+    origin: chunk.origin || null,
+    agent_body: chunk.agent_body || null,
+    environment: chunk.environment || null,
+    created_at: chunk.created_at || null
+  };
+}
 function normalizeOptionalSourceTool(value) {
   const normalized = String(value || '').trim();
   if (!normalized) return '';
@@ -1520,6 +1588,10 @@ function estimateToolUsageTokens(toolName, args = {}) {
     case 'recall':
       appendTokenCharCount(safeArgs.query, state);
       appendTokenCharCount(safeArgs.type, state);
+      break;
+    case 'get_summary':
+    case 'get_full':
+      appendTokenCharCount(safeArgs.id, state);
       break;
     case 'session_close':
       appendTokenCharCount(safeArgs.summary, state);
@@ -3442,6 +3514,45 @@ function buildPromoteTimeline(chunk, sourceMemory) {
     source_to_promoted_seconds: sourceToPromotedSeconds
   };
 }
+
+async function runGetSummary(args = {}) {
+  const chunkId = normalizeOptionalUuid(args.id, 'id');
+  if (!chunkId) {
+    throw new Error('id is required');
+  }
+  const chunk = await fetchChunkById(chunkId);
+  if (!chunk) {
+    throw new Error(`memory chunk not found: ${chunkId}`);
+  }
+  const preview = truncateChunkContent(chunk.content, CHUNK_SUMMARY_MAX_CHARS);
+  return {
+    ok: true,
+    ...buildChunkToolFields(chunk),
+    content: preview.content,
+    preview_truncated: preview.preview_truncated,
+    content_chars: preview.content_chars,
+    drill_down: 'Use get_full for complete chunk text.'
+  };
+}
+
+async function runGetFull(args = {}) {
+  const chunkId = normalizeOptionalUuid(args.id, 'id');
+  if (!chunkId) {
+    throw new Error('id is required');
+  }
+  const chunk = await fetchChunkById(chunkId);
+  if (!chunk) {
+    throw new Error(`memory chunk not found: ${chunkId}`);
+  }
+  const fullContent = String(chunk.content ?? '');
+  return {
+    ok: true,
+    ...buildChunkToolFields(chunk),
+    content: fullContent,
+    content_chars: fullContent.length
+  };
+}
+
 async function runExplainMemory(args = {}) {
   const chunkId = normalizeOptionalUuid(args.id, 'id');
   if (!chunkId) {
@@ -3768,8 +3879,14 @@ async function callTool(name, args = {}) {
               }
             }
           : {}),
-        items: explained.items
+        items: explained.items.map(applyRecallPreviewToItem)
       };
+    }
+    if (toolName === 'get_summary') {
+      return await runGetSummary(args);
+    }
+    if (toolName === 'get_full') {
+      return await runGetFull(args);
     }
     if (toolName === 'explain_memory') {
       return await runExplainMemory(args);

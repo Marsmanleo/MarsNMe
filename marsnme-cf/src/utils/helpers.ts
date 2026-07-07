@@ -57,7 +57,13 @@ export function formatMemoryForDisplay(memory: Memory, score?: number): string {
   return parts.join("\n");
 }
 
-export function formatInsightForDisplay(insight: Insight, score?: number): string {
+export function formatInsightForDisplay(
+  insight: Insight,
+  score?: number,
+  options?: { truncate?: boolean; maxChars?: number },
+): string {
+  const truncate = options?.truncate !== false;
+  const maxChars = options?.maxChars ?? 80;
   const parts: string[] = [];
   if (score !== undefined) {
     parts.push(`[${(score * 100).toFixed(1)}% match]`);
@@ -68,7 +74,13 @@ export function formatInsightForDisplay(insight: Insight, score?: number): strin
   if (insight.tags.length > 0) parts.push(`Tags: ${insight.tags.join(", ")}`);
   parts.push(`Created: ${formatTimestamp(insight.created_at)}`);
   parts.push("---");
-  parts.push(insight.content);
+  const raw = insight.content;
+  if (truncate && raw.length > maxChars) {
+    parts.push(`${raw.slice(0, maxChars)}…`);
+    parts.push(`(preview — use get_summary or get_full for more)`);
+  } else {
+    parts.push(raw);
+  }
 
   return parts.join("\n");
 }

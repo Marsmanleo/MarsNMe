@@ -10,7 +10,7 @@ import { createMcpHandler } from "agents/mcp";
 import { Env } from "./types/index.js";
 
 import { registerInsertMemory, registerListMemories, registerSearchMemories, registerSoftForget } from "./tools/memory-tools.js";
-import { registerMemoryIngest, registerRecall, registerDemoteMemory, registerExplainMemory } from "./tools/insight-tools.js";
+import { registerMemoryIngest, registerRecall, registerDemoteMemory, registerExplainMemory, registerGetSummary, registerGetFull } from "./tools/insight-tools.js";
 import { registerSessionBoot, registerSessionClose } from "./tools/session-tools.js";
 import { registerHealthCheck } from "./tools/system-tools.js";
 
@@ -63,6 +63,8 @@ function buildMcpServer(profile: string, env: Env, _ctx: ExecutionContext): McpS
   // Insight tools
   registerMemoryIngest(server, profile, env);
   registerRecall(server, profile, env);
+  registerGetSummary(server, profile, env);
+  registerGetFull(server, profile, env);
   registerDemoteMemory(server, profile, env);
   registerExplainMemory(server, profile, env);
 
