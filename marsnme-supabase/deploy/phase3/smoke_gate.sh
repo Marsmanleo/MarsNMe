@@ -131,7 +131,7 @@ COCO_TOOLS_JSON="$(mcp_jsonrpc "${COCO_URL}" '{"jsonrpc":"2.0","id":"coco-tools-
 TOTO_TOOLS_JSON="$(mcp_jsonrpc "${TOTO_URL}" '{"jsonrpc":"2.0","id":"toto-tools-list","method":"tools/list","params":{}}')"
 
 COCO_TOOLS_CHECK="$(TOOLS_PAYLOAD="${COCO_TOOLS_JSON}" node -e '
-const expected = ["insert_memory", "list_memories", "search_memories", "reload_source_registry", "recall", "health_check", "session_boot", "session_close", "dream_ingest", "memory_ingest", "demote_memory", "soft_forget", "explain_memory", "batch_promote"];
+const expected = ["insert_memory", "list_memories", "search_memories", "reload_source_registry", "recall", "get_summary", "get_full", "health_check", "session_boot", "session_close", "dream_ingest", "memory_ingest", "demote_memory", "soft_forget", "explain_memory", "batch_promote"];
 const prdTools = ["save_prd", "get_prd", "list_prds", "score_prd", "spawn_to_linear"];
 const payload = JSON.parse(process.env.TOOLS_PAYLOAD || "{}");
 if (payload.error) throw new Error("tools/list error: " + JSON.stringify(payload.error));
@@ -146,7 +146,7 @@ process.stdout.write(JSON.stringify({ tool_count: names.length, tools: names }))
 ')"
 
 TOTO_TOOLS_CHECK="$(TOOLS_PAYLOAD="${TOTO_TOOLS_JSON}" node -e '
-const expected = ["insert_memory", "list_memories", "search_memories", "reload_source_registry", "recall", "health_check", "session_boot", "session_close", "dream_ingest", "memory_ingest", "demote_memory", "soft_forget", "explain_memory", "batch_promote"];
+const expected = ["insert_memory", "list_memories", "search_memories", "reload_source_registry", "recall", "get_summary", "get_full", "health_check", "session_boot", "session_close", "dream_ingest", "memory_ingest", "demote_memory", "soft_forget", "explain_memory", "batch_promote"];
 const prdTools = ["save_prd", "get_prd", "list_prds", "score_prd", "spawn_to_linear"];
 const payload = JSON.parse(process.env.TOOLS_PAYLOAD || "{}");
 if (payload.error) throw new Error("tools/list error: " + JSON.stringify(payload.error));

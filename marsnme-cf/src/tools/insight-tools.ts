@@ -62,7 +62,7 @@ export function registerMemoryIngest(server: McpServer, profile: string, env: En
 export function registerRecall(server: McpServer, profile: string, env: Env) {
   server.tool(
     "recall",
-    "Semantic recall from long-term insights (and optionally memories)",
+    "Semantic recall from long-term insights (preview ~80 chars per match). Use get_summary or get_full to drill down by insight ID.",
     {
       query: z.string().describe("Recall query text"),
       limit: z.number().int().min(1).max(20).optional().describe("Max results (default 5)"),
@@ -173,7 +173,7 @@ export function registerExplainMemory(server: McpServer, profile: string, env: E
           content: [
             {
               type: "text",
-              text: `Type: long-term insight\n${formatInsightForDisplay(insight)}`,
+              text: `Type: long-term insight\n${formatInsightForDisplay(insight, undefined, { truncate: false })}`,
             },
           ],
         };
@@ -183,5 +183,59 @@ export function registerExplainMemory(server: McpServer, profile: string, env: E
         content: [{ type: "text", text: `No memory or insight found with ID: ${id}` }],
       };
     }
+  );
+}
+
+// ─── get_summary / get_full ───────────────────────────────────────────────────
+
+export function registerGetSummary(server: McpServer, profile: string, env: Env) {
+  server.tool(
+    "get_summary",
+    "Fetch a medium-length excerpt (~300 chars) of a long-term insight by ID. Use after recall when a preview match looks relevant.",
+    {
+      id: z.string().describe("Insight UUID"),
+    },
+    async ({ id }) => {
+      const row = await getInsightById(env, id, profile);
+      if (!row) {
+        return { content: [{ type: "text", text: `Insight not found: ${id}` }] };
+      }
+      const maxChars = 300;
+      const raw = row.content;
+      const truncated = raw.length > maxChars;
+      const text = truncated ? `${raw.slice(0, maxChars)}…` : raw;
+      return {
+        content: [
+          {
+            type: "text",
+            text: `${formatInsightForDisplay({ ...row, content: text }, undefined, { truncate: false })}\n\nDrill down: get_full for complete text.`,
+          },
+        ],
+      };
+    },
+  );
+}
+
+export function registerGetFull(server: McpServer, profile: string, env: Env) {
+  server.tool(
+    "get_full",
+    "Fetch the complete text of a long-term insight by ID.",
+    {
+      id: z.string().describe("Insight UUID"),
+    },
+    async ({ id }) => {
+      const row = await getInsightById(env, id, profile);
+      if (!row) {
+        return { content: [{ type: "text", text: `Insight not found: ${id}` }] };
+      }
+      return {
+        content: [
+          {
+            type: "text",
+            text: formatInsightForDisplay(row, undefined, { truncate: false }),
+          },
+        ],
+      };
+    },
   );
 }
