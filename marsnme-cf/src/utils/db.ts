@@ -133,20 +133,32 @@ export async function insertInsight(
   profile: string,
   insight: Omit<Insight, "profile" | "vector_ids">
 ): Promise<void> {
+  // Conditional columns: only write recipient_body/note/read_at for 便條 rows.
+  // Keeps non-note inserts working on D1 databases that haven't run the migration yet.
+  const hasNote = Boolean(insight.recipient_body);
+  const columns = hasNote
+    ? "(id, profile, content, origin_type, source_memory_id, tags, created_at, vector_ids, recipient_body, note, read_at)"
+    : "(id, profile, content, origin_type, source_memory_id, tags, created_at, vector_ids)";
+  const placeholders = hasNote
+    ? "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+    : "(?, ?, ?, ?, ?, ?, ?, ?)";
+  const binds: (string | number | null)[] = [
+    insight.id,
+    profile,
+    insight.content,
+    insight.origin_type ?? null,
+    insight.source_memory_id ?? null,
+    JSON.stringify(insight.tags),
+    insight.created_at,
+    JSON.stringify([]),
+  ];
+  if (hasNote) {
+    binds.push(insight.recipient_body ?? null, insight.note ?? null, insight.read_at ?? null);
+  }
   await env.DB.prepare(
-    `INSERT INTO insights (id, profile, content, origin_type, source_memory_id, tags, created_at, vector_ids)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+    `INSERT INTO insights ${columns} VALUES ${placeholders}`
   )
-    .bind(
-      insight.id,
-      profile,
-      insight.content,
-      insight.origin_type ?? null,
-      insight.source_memory_id ?? null,
-      JSON.stringify(insight.tags),
-      insight.created_at,
-      JSON.stringify([])
-    )
+    .bind(...binds)
     .run();
 }
 
@@ -174,6 +186,33 @@ export async function listInsights(
     .all();
 
   return (results || []).map((row: unknown) => parseInsightRow(row));
+}
+
+// ─── 便條 (Body-to-Body handoff notes) ────────────────────────────────────────
+
+export async function listUnreadNotes(
+  env: Env,
+  profile: string,
+  body: string,
+  limit = 3
+): Promise<Insight[]> {
+  const { results } = await env.DB.prepare(
+    `SELECT * FROM insights
+     WHERE profile = ? AND recipient_body = ? AND read_at IS NULL
+     ORDER BY created_at DESC LIMIT ?`
+  )
+    .bind(profile, body, Math.min(limit, 10))
+    .all();
+
+  return (results || []).map((row: unknown) => parseInsightRow(row));
+}
+
+export async function markNoteRead(env: Env, id: string): Promise<void> {
+  await env.DB.prepare(
+    `UPDATE insights SET read_at = ? WHERE id = ?`
+  )
+    .bind(Date.now(), id)
+    .run();
 }
 
 export async function getInsightById(
@@ -261,6 +300,9 @@ function parseInsightRow(row: unknown): Insight {
     tags: safeJsonParse(r.tags as string, []),
     created_at: Number(r.created_at),
     vector_ids: safeJsonParse(r.vector_ids as string, []),
+    recipient_body: r.recipient_body ? String(r.recipient_body) : undefined,
+    note: r.note ? String(r.note) : undefined,
+    read_at: r.read_at ? Number(r.read_at) : undefined,
   };
 }
 

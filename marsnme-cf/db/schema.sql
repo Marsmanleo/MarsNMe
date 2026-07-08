@@ -24,15 +24,23 @@ CREATE TABLE IF NOT EXISTS insights (
   id              TEXT PRIMARY KEY,
   profile         TEXT NOT NULL,
   content         TEXT NOT NULL,
-  origin_type     TEXT,           -- 'memory', 'ingest', 'dream'
+  origin_type     TEXT,           -- 'memory', 'ingest', 'dream', 'session_close'
   source_memory_id TEXT,
   tags            TEXT NOT NULL DEFAULT '[]',
   created_at      INTEGER NOT NULL,
-  vector_ids      TEXT NOT NULL DEFAULT '[]'
+  vector_ids      TEXT NOT NULL DEFAULT '[]',
+  recipient_body  TEXT,           -- 便條 recipient body name (NULL = not a note)
+  note            TEXT,           -- 便條 handoff content (NULL = not a note)
+  read_at         INTEGER         -- 便條 read timestamp (NULL = unread)
 );
 
 CREATE INDEX IF NOT EXISTS idx_insights_profile ON insights(profile);
 CREATE INDEX IF NOT EXISTS idx_insights_created_at ON insights(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_insights_unread_notes ON insights(recipient_body, read_at);
+
+-- Existing D1 databases: apply forward-only migration once (idempotent guard via PRAGMA).
+-- Fresh installs already get the columns from CREATE TABLE above.
+-- Run: wrangler d1 execute marsnme-cf-db --command "ALTER TABLE insights ADD COLUMN recipient_body TEXT; ALTER TABLE insights ADD COLUMN note TEXT; ALTER TABLE insights ADD COLUMN read_at INTEGER;"
 
 -- Entities: people, projects, concepts (knowledge graph nodes)
 CREATE TABLE IF NOT EXISTS entities (

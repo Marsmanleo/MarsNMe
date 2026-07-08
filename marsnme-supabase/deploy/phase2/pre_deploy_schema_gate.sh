@@ -151,7 +151,7 @@ for profile in "${PROFILE_LIST[@]}"; do
   profile_ident="$(quote_ident "${profile}")"
 
   check_sql "${profile}.memories required columns" \
-    "SELECT id,body,source,session_id,tags,agent_body,environment,promoted,promoted_at,created_at,expires_at FROM ${profile_ident}.memories LIMIT 0;"
+    "SELECT id,body,source,session_id,tags,agent_body,environment,promoted,promoted_at,created_at,expires_at,recipient_body,note,read_at FROM ${profile_ident}.memories LIMIT 0;"
 
   check_sql "${profile}.marsvault_chunks required columns" \
     "SELECT id,content,source_file,section,body,visibility,tags,type,date,origin,source_memory_id,source_session_id,source_tool,source_user_note,agent_body,environment,created_at,updated_at FROM ${profile_ident}.marsvault_chunks LIMIT 0;"

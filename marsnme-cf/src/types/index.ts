@@ -32,6 +32,9 @@ export interface Insight {
   tags: string[];
   created_at: number;
   vector_ids: string[];
+  recipient_body?: string; // 便條 recipient body name
+  note?: string;           // 便條 handoff content
+  read_at?: number;        // 便條 read timestamp (undefined = unread/not a note)
 }
 
 export interface Entity {

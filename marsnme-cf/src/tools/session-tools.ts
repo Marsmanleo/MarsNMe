@@ -11,16 +11,33 @@ import { formatMemoryForDisplay, formatInsightForDisplay } from "../utils/helper
 export function registerSessionBoot(server: McpServer, profile: string, env: Env) {
   server.tool(
     "session_boot",
-    "Start a session with context pre-load: read recent memories + insights",
+    "Start a session with context pre-load: read recent memories + insights + check 便條 (handoff notes)",
     {
       source: z.string().describe("Source tool: perplexity, cursor, warp, openclaw, hermes"),
       body_name: z.string().optional().describe("Body/persona name"),
       user_name: z.string().optional().describe("User/owner name"),
       topic: z.string().optional().describe("Current focus topic"),
       recall_limit: z.number().int().min(1).max(10).optional().describe("Max recalled items (default 5)"),
+      body: z.string().optional().describe("Recipient body name — check for 便條 (handoff notes) addressed to this body"),
     },
-    async ({ source, body_name, user_name, topic, recall_limit }) => {
+    async ({ source, body_name, user_name, topic, recall_limit, body }) => {
       const limit = recall_limit ?? 5;
+
+      // 0. Check for 便條 (handoff notes) addressed to this body, mark them read
+      let noteLines: string[] = [];
+      if (body) {
+        try {
+          const { listUnreadNotes, markNoteRead } = await import("../utils/db.js");
+          const notes = await listUnreadNotes(env, profile, body);
+          for (const n of notes) {
+            const sender = n.tags?.[1] ?? "unknown";
+            noteLines.push(`📋 ${sender} 留咗便條：${n.note ?? n.content}`);
+            await markNoteRead(env, n.id);
+          }
+        } catch {
+          // note columns may not be deployed yet — degrade gracefully, boot itself still succeeds
+        }
+      }
 
       // 1. Fetch recent unexpired memories
       const recentMemories = await listMemories(env, profile, {
@@ -65,6 +82,11 @@ export function registerSessionBoot(server: McpServer, profile: string, env: Env
       parts.push(`Source: ${source}`);
       if (body_name) parts.push(`Body: ${body_name}`);
       if (user_name) parts.push(`User: ${user_name}`);
+      if (noteLines.length > 0) {
+        parts.push(``);
+        parts.push(`--- 便條 (handoff notes) ---`);
+        parts.push(...noteLines);
+      }
       parts.push(``);
       parts.push(`Recent memories: ${recentMemories.length}`);
       parts.push(`Recent insights: ${recentInsights.length}`);
@@ -90,13 +112,15 @@ export function registerSessionBoot(server: McpServer, profile: string, env: Env
 export function registerSessionClose(server: McpServer, profile: string, env: Env) {
   server.tool(
     "session_close",
-    "Close session and store summary",
+    "Close session and store summary. Optional `to` + `note` leave a 便條 (handoff note) for another body, surfaced on that body's next session_boot.",
     {
       source: z.string().describe("Source tool"),
       summary: z.string().describe("Session close summary"),
       topics: z.array(z.string()).optional().describe("Topics covered"),
+      to: z.string().optional().describe("Recipient body name — leave a 便條 (handoff note) for another body"),
+      note: z.string().optional().describe("Short context handoff for the recipient body (used with `to`)"),
     },
-    async ({ source, summary, topics }) => {
+    async ({ source, summary, topics, to, note }) => {
       const id = crypto.randomUUID();
       const now = Date.now();
 
@@ -107,13 +131,23 @@ export function registerSessionClose(server: McpServer, profile: string, env: En
 
       const content = `Session close summary (${source}): ${summary}${topics && topics.length > 0 ? `\nTopics: ${topics.join(", ")}` : ""}`;
 
-      await insertInsight(env, profile, {
+      const baseInsight = {
         id,
         content,
-        origin_type: "session_close",
+        origin_type: "session_close" as const,
         tags: ["session-close", source, ...(topics ?? [])],
         created_at: now,
-      });
+      };
+      try {
+        await insertInsight(env, profile, {
+          ...baseInsight,
+          ...(to ? { recipient_body: to, note: note ?? "" } : {}),
+        });
+      } catch (insertError) {
+        if (!to) throw insertError;
+        // 便條 columns may be missing — fall back to plain close insert so close itself still lands
+        await insertInsight(env, profile, baseInsight);
+      }
 
       const embedding = await embed(content, env);
       const vectorId = `${profile}:insight:${id}`;
@@ -127,11 +161,12 @@ export function registerSessionClose(server: McpServer, profile: string, env: En
       const { updateInsightVectorIds } = await import("../utils/db.js");
       await updateInsightVectorIds(env, id, [vectorId]);
 
+      const noteConfirmation = to ? `\n便條 left for ${to}${note ? `: ${note}` : ""}` : "";
       return {
         content: [
           {
             type: "text",
-            text: `Session closed. Summary stored as insight ID: ${id}`,
+            text: `Session closed. Summary stored as insight ID: ${id}${noteConfirmation}`,
           },
         ],
       };

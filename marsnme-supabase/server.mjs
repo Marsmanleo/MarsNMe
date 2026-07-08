@@ -583,6 +583,10 @@ function buildTools() {
             default: 5,
             description: 'Maximum recall results per category (identity/workflow/status, default 5)'
           },
+          body: {
+            type: 'string',
+            description: 'Recipient body name — check for 便條 (handoff notes) addressed to this body and surface them at the top of boot output'
+          },
           alert_window_hours: {
             type: 'number',
             minimum: 1,
@@ -626,6 +630,14 @@ function buildTools() {
           mood: {
             type: 'string',
             description: 'Optional mood marker'
+          },
+          to: {
+            type: 'string',
+            description: 'Recipient body name — leave a 便條 (handoff note) for another body, surfaced on that body next session_boot'
+          },
+          note: {
+            type: 'string',
+            description: 'Short context handoff for the recipient body (used with `to`)'
           }
         },
         required: ['source', 'summary'],
@@ -2164,6 +2176,64 @@ async function upsertMemoryBySession({
   return fetched || null;
 }
 
+// ─── 便條 (Body-to-Body handoff notes) ────────────────────────────────────────
+// Stored as memories rows with recipient_body/note/read_at columns.
+// session_close(to, note) writes; session_boot(body) reads + marks read.
+// If the note columns are not yet deployed, these degrade gracefully (caller wraps in try/catch).
+
+const NOTE_SELECT_COLUMNS =
+  'id,body,source,session_id,tags,agent_body,environment,created_at,expires_at,recipient_body,note,read_at';
+
+async function insertNoteMemory({ source, to, note, body, tags, expires_at }) {
+  const resolvedAgentBody = resolveWriteAgentBody({ source });
+  const resolvedEnvironment = resolveWriteEnvironment({});
+  const createdId = crypto.randomUUID();
+  const payload = {
+    id: createdId,
+    body,
+    source,
+    session_id: `note:to:${to}:${createdId.slice(0, 8)}`,
+    tags: normalizeMemoryTagsWithContext(tags, resolvedAgentBody, resolvedEnvironment),
+    agent_body: resolvedAgentBody,
+    environment: resolvedEnvironment,
+    recipient_body: to,
+    note,
+    read_at: null
+  };
+  if (expires_at) payload.expires_at = expires_at;
+  const inserted = await supabaseRequest(`/rest/v1/memories?select=${NOTE_SELECT_COLUMNS}`, {
+    method: 'POST',
+    profile: DB_PROFILE,
+    prefer: 'return=representation',
+    body: [payload]
+  });
+  return Array.isArray(inserted) && inserted.length > 0 ? inserted[0] : null;
+}
+
+async function listUnreadNotes(bodyName, limit = 3) {
+  const query = new URLSearchParams();
+  query.set('select', NOTE_SELECT_COLUMNS);
+  query.set('recipient_body', `eq.${bodyName}`);
+  query.set('read_at', 'is.null');
+  query.set('order', 'created_at.desc');
+  query.set('limit', String(Math.min(limit, 10)));
+  const rows = await supabaseRequest(`/rest/v1/memories?${query.toString()}`, {
+    profile: DB_PROFILE
+  });
+  return Array.isArray(rows) ? rows : [];
+}
+
+async function markNoteRead(id) {
+  const query = new URLSearchParams();
+  query.set('id', `eq.${id}`);
+  await supabaseRequest(`/rest/v1/memories?${query.toString()}`, {
+    method: 'PATCH',
+    profile: DB_PROFILE,
+    prefer: 'return=minimal',
+    body: { read_at: new Date().toISOString() }
+  });
+}
+
 async function ensureDailyCloseRecovery(source, nowTs) {
   const yesterdayDate = new Date(toUtcStartOfDay(nowTs).getTime() - 86400000);
   const yesterdayDateKey = formatDateOnly(yesterdayDate);
@@ -2255,6 +2325,7 @@ async function runDailyBoot(args = {}) {
   const source = normalizeDailySource(args.source);
   const topic = normalizeOptionalText(args.topic, 200);
   const mood = normalizeOptionalText(args.mood, 80);
+  const bodyName = normalizeOptionalText(args.body, 60);
   const queries = buildDailyBootQueries(args);
   const inferredSourceAgentBody = inferAgentBodyFromSource(source);
   const recallScopeArgs = {
@@ -2348,12 +2419,34 @@ async function runDailyBoot(args = {}) {
       }
     : await ensureDailyCloseRecovery(source, nowTs);
 
+  // 便條: surface unread handoff notes addressed to this body, then mark read
+  let notes = [];
+  if (bodyName) {
+    try {
+      const unread = await listUnreadNotes(bodyName);
+      for (const n of unread) {
+        notes.push({
+          id: n.id,
+          from: normalizeOptionalText(n.source, 60) || 'unknown',
+          to: bodyName,
+          note: normalizeOptionalText(n.note, 1000) || '',
+          created_at: n.created_at
+        });
+        await markNoteRead(n.id);
+      }
+    } catch (error) {
+      // note columns may not be deployed yet — degrade gracefully, boot itself still succeeds
+      notes = [];
+    }
+  }
+
   return {
     ok: true,
     profile: DB_PROFILE,
     mode: existingHeartbeat ? 'welcome_back' : 'new_day',
     source,
     date: dateKey,
+    notes,
     heartbeat_id: savedHeartbeat?.id || null,
     agent_name: queries.agent_name,
     last_topic: previousTopic || null,
@@ -2388,6 +2481,8 @@ async function runDailyClose(args = {}) {
   }
   const topics = normalizeDailyTopics(args.topics);
   const mood = normalizeOptionalText(args.mood, 80);
+  const to = normalizeOptionalText(args.to, 60);
+  const note = to ? normalizeOptionalText(args.note, 1000) : null;
   const nowTs = new Date();
   const dateKey = dailyDateKey(nowTs);
   const toolUsageDailySummary = await fetchToolUsageDailySummary(dateKey);
@@ -2437,6 +2532,35 @@ async function runDailyClose(args = {}) {
         ? '有短記憶即將到期，建議先做 health_check 檢視'
         : null;
 
+  // 便條: optional handoff note addressed to another body
+  let noteResult = null;
+  if (to) {
+    try {
+      const noteTags = buildLifecycleMemoryTags(['note', `to:${to}`], source, dateKey);
+      const notePayload = {
+        type: 'note',
+        profile: DB_PROFILE,
+        source,
+        to,
+        note,
+        date: dateKey,
+        created_at: nowTs.toISOString()
+      };
+      const savedNote = await insertNoteMemory({
+        source,
+        to,
+        note: note || '',
+        body: JSON.stringify(notePayload),
+        tags: noteTags,
+        expires_at: expiresAt
+      });
+      noteResult = { to, note_id: savedNote?.id || null, delivered: Boolean(savedNote) };
+    } catch (error) {
+      // note columns may not be deployed yet — degrade gracefully, close itself still succeeds
+      noteResult = { to, delivered: false, error: String(error?.message || error) };
+    }
+  }
+
   return {
     ok: true,
     profile: DB_PROFILE,
@@ -2447,6 +2571,7 @@ async function runDailyClose(args = {}) {
     topics,
     mood: mood || null,
     tool_usage_daily_summary: toolUsageDailySummary,
+    note: noteResult,
     expiry_alert: {
       soon_expiring_count: soonExpiringCount,
       recommend_promote_count: recommendPromoteCount,
