@@ -585,7 +585,7 @@ function buildTools() {
           },
           body: {
             type: 'string',
-            description: 'Recipient body name — check for 便條 (handoff notes) addressed to this body and surface them at the top of boot output'
+            description: 'Recipient body name — check for 便條 (handoff notes) addressed to this body and surface them at the top of boot output. Defaults to current profile (e.g. "coco") so any CoCo body receives CoCo-addressed notes without passing an explicit body.'
           },
           alert_window_hours: {
             type: 'number',
@@ -2325,7 +2325,7 @@ async function runDailyBoot(args = {}) {
   const source = normalizeDailySource(args.source);
   const topic = normalizeOptionalText(args.topic, 200);
   const mood = normalizeOptionalText(args.mood, 80);
-  const bodyName = normalizeOptionalText(args.body, 60);
+  const bodyName = normalizeOptionalText(args.body, 60) || DB_PROFILE;
   const queries = buildDailyBootQueries(args);
   const inferredSourceAgentBody = inferAgentBodyFromSource(source);
   const recallScopeArgs = {

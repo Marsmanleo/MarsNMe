@@ -18,17 +18,20 @@ export function registerSessionBoot(server: McpServer, profile: string, env: Env
       user_name: z.string().optional().describe("User/owner name"),
       topic: z.string().optional().describe("Current focus topic"),
       recall_limit: z.number().int().min(1).max(10).optional().describe("Max recalled items (default 5)"),
-      body: z.string().optional().describe("Recipient body name — check for 便條 (handoff notes) addressed to this body"),
+      body: z.string().optional().describe("Recipient body name — check for 便條 (handoff notes) addressed to this body. Defaults to current profile so any CoCo body receives CoCo-addressed notes."),
     },
     async ({ source, body_name, user_name, topic, recall_limit, body }) => {
       const limit = recall_limit ?? 5;
 
-      // 0. Check for 便條 (handoff notes) addressed to this body, mark them read
+      // 0. Check for 便條 (handoff notes) addressed to this body, mark them read.
+      // Default routing key = profile (e.g. "coco") so any CoCo body receives
+      // CoCo-addressed notes without passing an explicit `body`.
+      const effectiveBody = body ?? profile;
       let noteLines: string[] = [];
-      if (body) {
+      if (effectiveBody) {
         try {
           const { listUnreadNotes, markNoteRead } = await import("../utils/db.js");
-          const notes = await listUnreadNotes(env, profile, body);
+          const notes = await listUnreadNotes(env, profile, effectiveBody);
           for (const n of notes) {
             const sender = n.tags?.[1] ?? "unknown";
             noteLines.push(`📋 ${sender} 留咗便條：${n.note ?? n.content}`);
