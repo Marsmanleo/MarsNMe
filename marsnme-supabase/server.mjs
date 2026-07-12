@@ -613,7 +613,7 @@ function buildTools() {
     {
       name: 'session_close',
       description:
-        `Save a ${PROFILE.displayName} session close summary before ending a conversation. The summary is stored as a short-term memory with 7-day retention, providing context for the next session boot. Include what was accomplished, what is still pending, and any important context for continuity.`,
+        `Save a ${PROFILE.displayName} session close summary before ending a conversation. The summary is stored as a short-term memory with 7-day retention, providing context for the next session boot. After saving, automatically promotes up to 5 soon-expiring short-term memories to long-term storage (alert window 48h); promote failures never fail the close. Include what was accomplished, what is still pending, and any important context for continuity.`,
       inputSchema: {
         type: 'object',
         properties: {
@@ -2514,6 +2514,23 @@ async function runDailyClose(args = {}) {
     expires_at: expiresAt,
     existing: existingClose
   });
+
+  // Auto-promote soon-expiring short-term memories (replaces Hermes dream schedule).
+  // Failure must never break session_close — summary is already stored.
+  let promotedCount = 0;
+  try {
+    const promoteResult = await runBatchPromote({
+      alert_window_hours: 48,
+      max_promote: 5
+    });
+    promotedCount = Math.max(0, Number(promoteResult?.promoted_count) || 0);
+  } catch (error) {
+    console.warn(
+      `[session_close] auto batch_promote failed: ${String(error?.message || error)}`
+    );
+    promotedCount = 0;
+  }
+
   const expirySnapshot = await runHealthExpiryCheck({
     alert_window_hours: 48
   });
@@ -2526,11 +2543,13 @@ async function runDailyClose(args = {}) {
     Number(expirySnapshot?.expiry_alert?.recommended_for_promotion_count) || 0
   );
   const expiryAction =
-    recommendPromoteCount > 0
-      ? '建議叫 Hermes 或三哥 promote'
-      : soonExpiringCount > 0
-        ? '有短記憶即將到期，建議先做 health_check 檢視'
-        : null;
+    promotedCount > 0
+      ? `auto-promoted ${promotedCount} expiring memor${promotedCount === 1 ? 'y' : 'ies'}`
+      : recommendPromoteCount > 0
+        ? 'expiring memories remain — call batch_promote or wait for next session_close'
+        : soonExpiringCount > 0
+          ? 'short-term memories approaching expiry — review with health_check if needed'
+          : null;
 
   // 便條: optional handoff note addressed to another body
   let noteResult = null;
@@ -2572,6 +2591,7 @@ async function runDailyClose(args = {}) {
     mood: mood || null,
     tool_usage_daily_summary: toolUsageDailySummary,
     note: noteResult,
+    promoted_count: promotedCount,
     expiry_alert: {
       soon_expiring_count: soonExpiringCount,
       recommend_promote_count: recommendPromoteCount,
