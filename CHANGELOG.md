@@ -8,6 +8,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## [Unreleased]
 
 ### Added
+- **session_close auto-promote**: after storing the close summary, `session_close` calls `runBatchPromote` with `alert_window_hours=48` and `max_promote=5` so soon-expiring short-term memories are promoted without Hermes or a manual `batch_promote`. Promote failures are logged and return `promoted_count: 0` — they never fail the close. Response includes top-level `promoted_count`.
 - **Cloudflare Routing Worker** (`marsnme-supabase/cloudflare-routing-worker/`): username-based MCP reverse proxy
   - Setup wizard page at `/setup` with bilingual UI (EN + 繁體中文), dark/light theme, autosave
   - Registration API at `/api/register` for Supabase and D1 (self-hosted) modes
