@@ -39,23 +39,34 @@ curl -fsSL https://marsnme.com/install.sh | bash
 >
 > — Leo, MarsNMe creator (3 months of daily use across 4 AI tools)
 
-## Available MCP Tools (13)
+## Available MCP Tools (16)
 
 | Tool | Description |
 |---|---|
 | `insert_memory` | Store short-term memory |
 | `list_memories` | List recent memories |
 | `search_memories` | Semantic search via Jina embeddings |
-| `recall` | Long-term chunk recall from profile schema |
+| `recall` | Long-term chunk recall — ~80-char preview per match |
+| `get_summary` | Medium excerpt (~300 chars) of a chunk by ID |
+| `get_full` | Complete text of a long-term chunk by ID |
 | `memory_ingest` | Ingest long-term insight chunks |
 | `dream_ingest` | Dream-mode long-term ingestion |
 | `session_boot` | Start a session with context pre-load |
-| `session_close` | Close session and summarize |
+| `session_close` | Close session, summarize, auto-promote expiring memories |
 | `health_check` | Coverage, expiry, conflict diagnostics |
 | `reload_source_registry` | Refresh source whitelist at runtime |
 | `demote_memory` | Demote a memory to lower priority |
 | `soft_forget` | Soft-delete a memory |
 | `explain_memory` | Explain a memory's provenance |
+| `batch_promote` | Promote expiring short-term memories to long-term |
+
+## What's new in 0.3.0
+
+- **3-layer recall**: `recall` returns ~80-char previews, then `get_summary` (~300 chars), then `get_full` (complete). Avoids token-dumping full chunks on every recall; drill down only when a preview looks relevant.
+- **Body-to-body note handoff**: `session_close(to=<body>, note=...)` leaves a note that `session_boot(body=<target>)` delivers and marks read — one agent can hand context to another.
+- **Auto `batch_promote` on `session_close`**: closing a session automatically promotes soon-expiring short-term memories (48h window, up to 5) to long-term storage — no Hermes or manual promote needed.
+- **`grok` + `draft` sources**: added to the source whitelist so the Grok body and Draft lifecycle hooks can write memories natively.
+- **CoCo-only tool surface**: PRD tools (`save_prd`, `get_prd`, `list_prds`, `score_prd`, `spawn_to_linear`) removed from the Supabase gateway — idea/PRD/task execution now lives in [Draft](https://github.com/Marsmanleo/draft-ai). MarsNMe = CoCo soul memory only.
 
 # MarsNMe
 ## Why MarsNMe?
@@ -92,7 +103,7 @@ Most AI memory tools help AI remember you. **MarsNMe helps you and your AI remem
 | `marsnme-cf/` | Cloudflare Workers + D1 + Vectorize | Self-host template; **not** the Proxmox deploy path |
 | `marsnme-supabase/cloudflare-routing-worker/` | `mcp.marsnme.com` routing proxy | Public setup wizard → upstream gateway |
 
-**Product split (Mars Group):** Idea / PRD / task execution → [Draft](https://github.com/Marsmanleo/draft-ai) + `draft-mcp`. **MarsNMe Supabase = CoCo soul memory only** (recall, session boot/close, ingest, lifecycle). As of `@marsnme/mcp-gateway` v0.2.2, PRD MCP tools (`save_prd`, `get_prd`, `list_prds`, `score_prd`, `spawn_to_linear`) are removed from the Supabase gateway — use Draft for idea/PRD/task workflows.
+**Product split (Mars Group):** Idea / PRD / task execution → [Draft](https://github.com/Marsmanleo/draft-ai) + `draft-mcp`. **MarsNMe Supabase = CoCo soul memory only** (recall, session boot/close, ingest, lifecycle). As of `@marsnme/mcp-gateway` v0.3.0, PRD MCP tools (`save_prd`, `get_prd`, `list_prds`, `score_prd`, `spawn_to_linear`) are removed from the Supabase gateway — use Draft for idea/PRD/task workflows.
 
 **Proxmox deploy:** private [MarsNMe-lab](https://github.com/Marsmanleo/MarsNMe-lab) — `deploy/deploy-proxmox-ct101.sh` or GitHub `cd-selfhosted` workflow. Not a single-script deploy like draft-mcp.
 
@@ -324,16 +335,18 @@ This public repository currently keeps two built-in legacy profile IDs (`coco`, 
 ## Current capabilities
 - MCP methods: `initialize`, `notifications/initialized`, `tools/list`, `tools/call`, `ping`
 - Profiles: configurable profile IDs (legacy built-ins: `coco`, `toto`)
-- Memory tools:
+- Memory tools (16):
   - `insert_memory` (short-term memory)
   - `list_memories`
   - `search_memories` (Jina embedding search)
-  - `recall` (long-term chunk recall from profile schema)
+  - `recall` (~80-char preview) then `get_summary` (~300-char excerpt) then `get_full` (complete text)
   - `memory_ingest` / `dream_ingest` (long-term chunk ingestion)
-  - `session_boot` / `session_close` (daily rhythm lifecycle)
+  - `session_boot` / `session_close` (daily rhythm lifecycle; close auto-promotes expiring memories + supports body-to-body note handoff)
   - `health_check` (coverage, expiry, conflict diagnostics)
   - `reload_source_registry` (refresh source whitelist at runtime)
   - `demote_memory` / `soft_forget` / `explain_memory` (memory lifecycle management)
+  - `batch_promote` (promote expiring short-term memories to long-term)
+- Sources: `perplexity`, `cursor`, `warp`, `openclaw`, `hermes`, `draft`, `grok`
 - OAuth-protected MCP endpoint (configurable by environment variables)
 
 ## Memory model
