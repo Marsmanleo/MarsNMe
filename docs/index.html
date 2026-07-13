@@ -376,7 +376,7 @@ footer a:hover{color:var(--color-text);}
           </a>
         </div>
         <div class="hero-stats">
-          <div class="stat"><span class="stat-num" id="stat-tools">13</span><span class="stat-label">MCP Tools</span></div>
+          <div class="stat"><span class="stat-num" id="stat-tools">16</span><span class="stat-label">MCP Tools</span></div>
           <div class="stat"><span class="stat-num">∞</span><span class="stat-label">Profiles</span></div>
           <div class="stat"><span class="stat-num">1024</span><span class="stat-label">Embedding Dims</span></div>
           <div class="stat"><span class="stat-num">∞</span><span class="stat-label">Memory Horizon</span></div>
@@ -481,7 +481,7 @@ footer a:hover{color:var(--color-text);}
           <span class="t-line"><span class="t-output">{</span></span>
           <span class="t-line"><span class="t-output">&nbsp;&nbsp;"status": "ok",</span></span>
           <span class="t-line"><span class="t-output">&nbsp;&nbsp;"profile": "my-agent",</span></span>
-          <span class="t-line"><span class="t-output">&nbsp;&nbsp;"tools": 13,</span></span>
+          <span class="t-line"><span class="t-output">&nbsp;&nbsp;"tools": 16,</span></span>
           <span class="t-line"><span class="t-output">&nbsp;&nbsp;"uptime": 42</span></span>
           <span class="t-line"><span class="t-output">}</span></span>
           <span class="t-line">&nbsp;</span>
@@ -502,9 +502,9 @@ footer a:hover{color:var(--color-text);}
         <div class="feature-icon">
           <svg viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
         </div>
-        <div class="feature-title">Semantic Recall</div>
-        <p class="feature-desc">Jina embeddings v3 with 1024 dimensions. Find memories by meaning, not just keywords. pgvector HNSW index for millisecond retrieval.</p>
-        <span class="feature-tag">jina-embeddings-v3</span>
+        <div class="feature-title">3-Layer Semantic Recall</div>
+        <p class="feature-desc">Jina embeddings v3 (1024-dim pgvector HNSW, millisecond retrieval). Three layers: recall returns ~80-char previews, get_summary fetches ~300-char excerpts, get_full pulls complete text — drill down only when a match looks relevant.</p>
+        <span class="feature-tag">recall · get_summary · get_full</span>
       </div>
       <div class="feature-card reveal">
         <div class="feature-icon">
@@ -712,7 +712,7 @@ URL: http://127.0.0.1:18790/mcp</span></pre>
 
 <span style="color:var(--color-text-faint)"># Verify</span>
 <span style="color:var(--color-accent)">$</span> <span style="color:var(--color-text)">curl http://127.0.0.1:18790/health</span>
-<span style="color:var(--color-green)">{"status":"ok","profile":"my-agent","tools":13}</span></pre>
+<span style="color:var(--color-green)">{"status":"ok","profile":"my-agent","tools":16}</span></pre>
             </div>
             <div class="install-note">
               Requires: <span style="color:var(--color-text-muted)">Node.js 20+</span> · <span style="color:var(--color-text-muted)">Supabase project</span> · <span style="color:var(--color-text-muted)">JINA_API_KEY</span>
@@ -739,7 +739,7 @@ URL: http://127.0.0.1:18790/mcp</span></pre>
             <div class="install-note">
               <strong>Cloud hosted:</strong> No infrastructure needed. Supabase + our routing worker handles everything.<br>
               <strong>Self-hosted:</strong> Your own Cloudflare account. No Supabase needed — uses D1 + Workers AI + Vectorize.<br>
-              Both paths expose the same <span style="color:var(--color-text-muted)">13 MCP tools</span>.
+Both paths expose the same <span style="color:var(--color-text-muted)">16 MCP tools</span>.
             </div>
           </div>
         </div>
@@ -752,7 +752,7 @@ URL: http://127.0.0.1:18790/mcp</span></pre>
 <section id="tools">
   <div class="container">
     <div class="section-label reveal">API Reference</div>
-    <h2 class="section-title reveal">13 tools. Everything<br>your agent needs.</h2>
+    <h2 class="section-title reveal">16 tools. Everything<br>your agent needs.</h2>
     <div class="tools-grid">
       <div class="tool-row reveal">
         <span class="tool-name">insert_memory</span>
@@ -779,7 +779,21 @@ URL: http://127.0.0.1:18790/mcp</span></pre>
         <span class="tool-name">recall</span>
         <div class="tool-info">
           <h4>Semantic recall long-term <span class="memory-badge badge-long">LONG</span></h4>
-          <p>Deep semantic search over marsvault_chunks. Routes to your profile schema. Supports type, visibility, and similarity filters.</p>
+          <p>Deep semantic search over marsvault_chunks. Returns ~80-char preview snippets per match — drill down with get_summary / get_full. Supports type, visibility, and similarity filters.</p>
+        </div>
+      </div>
+      <div class="tool-row reveal">
+        <span class="tool-name">get_summary</span>
+        <div class="tool-info">
+          <h4>Fetch chunk summary <span class="memory-badge badge-long">LONG</span></h4>
+          <p>Fetch a medium excerpt (~300 chars) of a long-term chunk by ID. Use after recall when a preview match looks relevant and you need more context.</p>
+        </div>
+      </div>
+      <div class="tool-row reveal">
+        <span class="tool-name">get_full</span>
+        <div class="tool-info">
+          <h4>Fetch full chunk <span class="memory-badge badge-long">LONG</span></h4>
+          <p>Fetch the complete text of a long-term chunk by ID. Use sparingly after recall/get_summary when you need the full institutional memory entry.</p>
         </div>
       </div>
       <div class="tool-row reveal">
@@ -806,8 +820,8 @@ URL: http://127.0.0.1:18790/mcp</span></pre>
       <div class="tool-row reveal">
         <span class="tool-name">session_close</span>
         <div class="tool-info">
-          <h4>Session close summary <span class="memory-badge badge-ops">OPS</span></h4>
-          <p>Store session close summary with configurable retention. Captures topics, mood, and key outcomes for next session.</p>
+          <h4>Session close + auto-promote <span class="memory-badge badge-ops">OPS</span></h4>
+          <p>Store session close summary with configurable retention. Auto-promotes soon-expiring short-term memories to long-term, and supports body-to-body note handoff via session_boot.</p>
         </div>
       </div>
       <div class="tool-row reveal">
@@ -843,6 +857,13 @@ URL: http://127.0.0.1:18790/mcp</span></pre>
         <div class="tool-info">
           <h4>Explain memory content <span class="memory-badge badge-ops">OPS</span></h4>
           <p>Get a human-readable explanation of a specific memory entry. Shows metadata, source, tags, and relevance context.</p>
+        </div>
+      </div>
+      <div class="tool-row reveal">
+        <span class="tool-name">batch_promote</span>
+        <div class="tool-info">
+          <h4>Promote expiring memories <span class="memory-badge badge-ops">OPS</span></h4>
+          <p>Automatically promote soon-expiring short-term memories to long-term storage. Supports dry-run and explicit ID lists. Auto-triggered on session_close.</p>
         </div>
       </div>
     </div>
@@ -999,7 +1020,7 @@ function animateNum(el, target, duration=1200) {
 const statsObserver = new IntersectionObserver((entries) => {
   entries.forEach(e => {
     if(e.isIntersecting) {
-      animateNum(document.getElementById('stat-tools'),13);
+      animateNum(document.getElementById('stat-tools'),16);
       statsObserver.disconnect();
     }
   });
