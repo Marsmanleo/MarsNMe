@@ -10,13 +10,13 @@
     "id": "1239788982",
     "subfolder": "marsnme-supabase"
   },
-  "version": "0.2.2",
+  "version": "0.3.0",
   "packages": [
     {
       "registryType": "npm",
       "registryBaseUrl": "https://registry.npmjs.org",
       "identifier": "@marsnme/mcp-gateway",
-      "version": "0.2.2",
+      "version": "0.3.0",
       "runtimeHint": "npx",
       "transport": {
         "type": "streamable-http",

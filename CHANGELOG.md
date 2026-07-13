@@ -7,8 +7,38 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+_No unreleased changes._
+
+## [0.3.0] - 2026-07-13
 ### Added
-- **session_close auto-promote**: after storing the close summary, `session_close` calls `runBatchPromote` with `alert_window_hours=48` and `max_promote=5` so soon-expiring short-term memories are promoted without Hermes or a manual `batch_promote`. Promote failures are logged and return `promoted_count: 0` — they never fail the close. Response includes top-level `promoted_count`.
+- **3-layer recall**: `recall` returns ~80-char preview snippets per match. New `get_summary` (~300 chars) and `get_full` (complete text) tools let callers drill down by chunk ID instead of token-dumping full chunks on every recall (#98).
+- **`batch_promote` tool**: automatically promote expiring short-term memories to long-term storage, with dry-run mode and explicit ID lists (#101).
+- **Auto `batch_promote` on `session_close`**: closing a session promotes soon-expiring short-term memories (48h window, up to 5) without Hermes or a manual `batch_promote`. Promote failures are logged and never fail the close. Response includes top-level `promoted_count` (#101).
+- **Body-to-body note handoff**: `session_close(to=<body>, note=…)` leaves a note that `session_boot(body=<target>)` delivers and marks `read_at` (#99, #100).
+- **`session_boot` auto-recall**: prioritizes recent `session_close` insights on boot (#93).
+- **`grok` + `draft` sources**: added to the source whitelist for `coco` and `toto` profiles, enabling the Grok body and Draft lifecycle hooks to write memories natively (#97, #102).
+### Changed
+- Refactored folder names: `soul-memory/` → `marsnme-supabase/`, `marsnme-local/` → `marsnme-cf/` (#95).
+- Added runtime folder map and CoCo soul-memory product scope docs (#94).
+### Fixed
+- `GET /mcp` returns 405 so clients fall back to POST-only streamable HTTP (#91).
+- Allow `batch-promote` origin in `coco.marsvault_chunks` (#92).
+### Removed
+- PRD MCP tools (`save_prd`, `get_prd`, `list_prds`, `score_prd`, `spawn_to_linear`) removed from the Supabase gateway — idea/PRD/task execution now lives in [Draft](https://github.com/Marsmanleo/draft-ai). MarsNMe = CoCo soul memory only (added in #90, removed in #96).
+
+## [0.2.1] - 2026-06-11
+### Added
+- Trilingual README: zh-TW, zh-HK (#81) and zh-CN (#82).
+- `stdio.mjs` — stdio→HTTP bridge for Glama MCP proxy (#82).
+### Changed
+- Enhanced all 14 MCP tool descriptions for Glama quality score (#84).
+### Fixed
+- Restored runtime template variables in tool descriptions (#85).
+- Clarified `list_memories` as daily-log style listing with differentiation guidance (#86).
+- Glama score badge cache busted, linked to score page (#87).
+
+## [0.2.0] - 2026-06-10
+### Added
 - **Cloudflare Routing Worker** (`marsnme-supabase/cloudflare-routing-worker/`): username-based MCP reverse proxy
   - Setup wizard page at `/setup` with bilingual UI (EN + 繁體中文), dark/light theme, autosave
   - Registration API at `/api/register` for Supabase and D1 (self-hosted) modes
@@ -22,6 +52,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   - Tools: `insert_memory`, `list_memories`, `search_memories`, `soft_forget`, `memory_ingest`, `recall`, `demote_memory`, `explain_memory`, `session_boot`, `session_close`, `health_check`
   - D1 schema with memories, insights, entities, relations, observations tables
   - Workers AI embeddings (bge-base-en-v1.5, 768 dimensions) with Vectorize
+### Changed
+- Synced lab `batch_promote`, auth mode, and recall hygiene (#79).
 
 ## [0.1.7] - upcoming
 ### Changed
@@ -86,7 +118,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
-[Unreleased]: https://github.com/Marsmanleo/MarsNMe/compare/v0.1.6...HEAD
+[Unreleased]: https://github.com/Marsmanleo/MarsNMe/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/Marsmanleo/MarsNMe/compare/v0.2.1...v0.3.0
+[0.2.1]: https://github.com/Marsmanleo/MarsNMe/compare/v0.2.0...v0.2.1
+[0.2.0]: https://github.com/Marsmanleo/MarsNMe/compare/v0.1.7...v0.2.0
 [0.1.7]: https://github.com/Marsmanleo/MarsNMe/compare/v0.1.6...v0.1.7
 [0.1.6]: https://github.com/Marsmanleo/MarsNMe/compare/v0.1.5...v0.1.6
 [0.1.5]: https://github.com/Marsmanleo/MarsNMe/compare/v0.1.3...v0.1.5

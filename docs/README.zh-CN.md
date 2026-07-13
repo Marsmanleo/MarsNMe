@@ -38,23 +38,34 @@ curl -fsSL https://marsnme.com/install.sh | bash
 >
 > — Leo，MarsNMe 创造者（连续 3 个月每日使用 4 个 AI 工具）
 
-## 可用的 MCP 工具（13 个）
+## 可用的 MCP 工具（16 个）
 
 | 工具 | 说明 |
 |---|---|
 | `insert_memory` | 存储短期记忆 |
 | `list_memories` | 列出近期记忆 |
 | `search_memories` | 通过 Jina 语义嵌入搜索 |
-| `recall` | 从配置文件 schema 进行长期块召回 |
+| `recall` | 长期块召回 — ~80 字预览 |
+| `get_summary` | 获取区块中等长度摘要（~300 字） |
+| `get_full` | 获取长期区块完整内容 |
 | `memory_ingest` | 导入长期洞察块 |
 | `dream_ingest` | 梦境模式长期导入 |
 | `session_boot` | 启动会话并预加载上下文 |
-| `session_close` | 关闭会话并生成摘要 |
+| `session_close` | 关闭会话、生成摘要、自动升级即将到期记忆 |
 | `health_check` | 覆盖率、到期、冲突诊断 |
 | `reload_source_registry` | 运行时刷新来源白名单 |
 | `demote_memory` | 将记忆降级为较低优先级 |
 | `soft_forget` | 软删除一条记忆 |
 | `explain_memory` | 解释一条记忆的来源轨迹 |
+| `batch_promote` | 将即将到期的短期记忆升级为长期 |
+
+## 0.3.0 新功能
+
+- **三层召回**：`recall` 返回 ~80 字预览 → `get_summary`（~300 字）→ `get_full`（完整）。避免每次召回都倾倒完整区块，只在预览看起来相关时才深入。
+- **跨 body 便条交接**：`session_close(to=<body>, note=…)` 留下便条，由 `session_boot(body=<target>)` 投递并标记已读——一个代理可将上下文交给另一个。
+- **`session_close` 自动 `batch_promote`**：关闭会话时自动将即将到期的短期记忆（48 小时窗口，最多 5 条）升级为长期——无需 Hermes 或手动升级。
+- **`grok` + `draft` 来源**：加入来源白名单，让 Grok body 与 Draft 生命周期挂钩可直接写入记忆。
+- **CoCo 专属工具面**：PRD 工具（`save_prd`、`get_prd`、`list_prds`、`score_prd`、`spawn_to_linear`）从 Supabase 网关移除——idea/PRD/任务执行改至 [Draft](https://github.com/Marsmanleo/draft-ai)。MarsNMe = 仅 CoCo 灵魂记忆。
 
 ## 为什么选 MarsNMe？
 
@@ -310,16 +321,18 @@ curl -sS http://127.0.0.1:18790/mcp \
 ## 当前功能
 - MCP 方法：`initialize`、`notifications/initialized`、`tools/list`、`tools/call`、`ping`
 - 配置文件：可配置的配置 ID（旧版内置：`coco`、`toto`）
-- 记忆工具：
+- 记忆工具（16 个）：
   - `insert_memory`（短期记忆）
   - `list_memories`
   - `search_memories`（Jina 嵌入搜索）
-  - `recall`（从配置 schema 进行长期块召回）
+  - `recall`（~80 字预览）→ `get_summary`（~300 字摘要）→ `get_full`（完整文字）
   - `memory_ingest` / `dream_ingest`（长期块导入）
-  - `session_boot` / `session_close`（日常节奏生命周期）
+  - `session_boot` / `session_close`（日常节奏生命周期；close 自动升级即将到期记忆 + 支持跨 body 便条交接）
   - `health_check`（覆盖率、到期、冲突诊断）
   - `reload_source_registry`（运行时刷新来源白名单）
   - `demote_memory` / `soft_forget` / `explain_memory`（记忆生命周期管理）
+  - `batch_promote`（将即将到期的短期记忆升级为长期）
+- 来源：`perplexity`、`cursor`、`warp`、`openclaw`、`hermes`、`draft`、`grok`
 - OAuth 保护的 MCP 端点（通过环境变量配置）
 
 ## 记忆模型
