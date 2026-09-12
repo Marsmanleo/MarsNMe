@@ -816,6 +816,53 @@ function buildTools() {
         },
         additionalProperties: false
       }
+    },
+    // ── MARS-318: Board v0 ─────────────────────────────────────
+    {
+      name: 'board_read',
+      description: 'Read unread board posts (the CoCo family wall). Returns posts not yet acknowledged by the calling body. Called automatically by session_boot, but can also be called manually.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          body: { type: 'string', description: 'The body name reading the board (e.g. "三哥", "四哥", "大家姐", "leo")' },
+          limit: { type: 'number', minimum: 1, maximum: 50, default: 10, description: 'Maximum posts to return' },
+          topic: { type: 'string', description: 'Optional topic filter' },
+          include_acked: { type: 'boolean', default: false, description: 'Include already-acknowledged posts' }
+        },
+        required: ['body'],
+        additionalProperties: false
+      }
+    },
+    {
+      name: 'board_post',
+      description: 'Post a message to the CoCo family board (wall). to="all" broadcasts to the wall; to="<body>" is a private note.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          from_source: { type: 'string', description: 'Source platform (warp / cursor / perplexity / grok / hermes / draft)' },
+          from_body: { type: 'string', description: 'Posting body name (e.g. "三哥", "leo")' },
+          to: { type: 'string', default: 'all', description: '"all" for wall broadcast; specific body name for private note' },
+          topic: { type: 'string', description: 'Topic tag (e.g. "board-v0", "egress")' },
+          type: { type: 'string', enum: ['stuck', 'turn', 'collide', 'gate'], default: 'turn', description: 'Post type' },
+          text: { type: 'string', description: 'Post content (max 2000 chars)' },
+          expires_at: { type: 'string', description: 'Optional expiry in ISO 8601. null = permanent.' }
+        },
+        required: ['from_source', 'from_body', 'text'],
+        additionalProperties: false
+      }
+    },
+    {
+      name: 'board_ack',
+      description: 'Acknowledge (mark as read) one or more board posts for a specific body.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          body: { type: 'string', description: 'The body acknowledging (e.g. "三哥")' },
+          ids: { type: 'array', items: { type: 'string' }, minItems: 1, maxItems: 50, description: 'Board post UUIDs to acknowledge' }
+        },
+        required: ['body', 'ids'],
+        additionalProperties: false
+      }
     }
   ];
 }
@@ -2440,6 +2487,37 @@ async function runDailyBoot(args = {}) {
     }
   }
 
+  // MARS-318: Board v0 — auto-fetch unread wall posts for this body
+  let boardUnread = [];
+  const boardBody = bodyName || inferAgentBodyFromSource(source) || DB_PROFILE;
+  try {
+    const bQuery = new URLSearchParams();
+    bQuery.set('select', 'id,from_source,from_body,to,topic,type,text,acked_by,created_at');
+    bQuery.set('order', 'created_at.desc');
+    bQuery.set('limit', '5');
+    bQuery.set('archived_at', 'is.null');
+    bQuery.set('or', `(to.eq.all,to.eq.${boardBody})`);
+    const bResult = await supabaseRequest(`/rest/v1/board_posts?${bQuery.toString()}`, { profile: DB_PROFILE });
+    const bPosts = Array.isArray(bResult) ? bResult : [];
+    boardUnread = bPosts
+      .filter(p => {
+        const ab = p.acked_by && typeof p.acked_by === 'object' ? p.acked_by : {};
+        return !ab[boardBody];
+      })
+      .map(p => ({
+        id: p.id,
+        from: `${p.from_body}@${p.from_source}`,
+        to: p.to,
+        topic: p.topic || null,
+        type: p.type,
+        text: (p.text || '').slice(0, 160),
+        created_at: p.created_at
+      }));
+  } catch {
+    // board_posts table may not exist yet — degrade gracefully
+    boardUnread = [];
+  }
+
   return {
     ok: true,
     profile: DB_PROFILE,
@@ -2447,6 +2525,7 @@ async function runDailyBoot(args = {}) {
     source,
     date: dateKey,
     notes,
+    board_unread: boardUnread,
     heartbeat_id: savedHeartbeat?.id || null,
     agent_name: queries.agent_name,
     last_topic: previousTopic || null,
@@ -4256,6 +4335,123 @@ async function callTool(name, args = {}) {
             }
           : null
       };
+    }
+
+    // ── MARS-318: Board v0 handlers ──────────────────────────
+    if (toolName === 'board_read') {
+      const body = String(args.body || '').trim();
+      if (!body) throw new Error('body is required');
+      const limitRaw = Number(args.limit ?? 10);
+      const limit = Number.isFinite(limitRaw) ? Math.max(1, Math.min(50, Math.trunc(limitRaw))) : 10;
+      const includeAcked = Boolean(args.include_acked);
+      const topic = args.topic ? String(args.topic).trim() : '';
+
+      const query = new URLSearchParams();
+      query.set('select', 'id,from_source,from_body,to,topic,type,text,acked_by,expires_at,archived_at,created_at');
+      query.set('order', 'created_at.desc');
+      query.set('limit', String(limit));
+      query.set('archived_at', 'is.null');
+      // Wall posts (to=all) + posts addressed to this body
+      query.set('or', `(to.eq.all,to.eq.${body})`);
+      if (topic) query.set('topic', `eq.${topic}`);
+      // Exclude expired
+      query.set('or', `(expires_at.is.null,expires_at.gt.${new Date().toISOString()})`);
+
+      const result = await supabaseRequest(`/rest/v1/board_posts?${query.toString()}`, { profile: DB_PROFILE });
+      const posts = Array.isArray(result) ? result : [];
+
+      // Filter out already-acked posts unless include_acked
+      const filtered = includeAcked
+        ? posts
+        : posts.filter(p => {
+            const ackedBy = p.acked_by && typeof p.acked_by === 'object' ? p.acked_by : {};
+            return !ackedBy[body];
+          });
+
+      return {
+        ok: true,
+        count: filtered.length,
+        body,
+        posts: filtered.map(p => ({
+          id: p.id,
+          from: `${p.from_body}@${p.from_source}`,
+          to: p.to,
+          topic: p.topic || null,
+          type: p.type,
+          text: (p.text || '').slice(0, 160),
+          created_at: p.created_at,
+          acked: !!(p.acked_by && p.acked_by[body])
+        }))
+      };
+    }
+
+    if (toolName === 'board_post') {
+      const fromSource = String(args.from_source || '').trim();
+      const fromBody = String(args.from_body || '').trim();
+      const to = String(args.to || 'all').trim();
+      const topic = args.topic ? String(args.topic).trim() : null;
+      const type = args.type || 'turn';
+      const text = String(args.text || '').trim();
+      const expiresAt = args.expires_at ? String(args.expires_at).trim() : null;
+
+      if (!fromSource) throw new Error('from_source is required');
+      if (!fromBody) throw new Error('from_body is required');
+      if (!text) throw new Error('text is required');
+      if (text.length > 2000) throw new Error('text too long (max 2000 chars)');
+
+      const payload = {
+        from_source: fromSource,
+        from_body: fromBody,
+        to,
+        topic,
+        type,
+        text
+      };
+      if (expiresAt) payload.expires_at = expiresAt;
+
+      const result = await supabaseRequest(
+        '/rest/v1/board_posts?select=id,from_source,from_body,to,topic,type,text,created_at',
+        {
+          method: 'POST',
+          profile: DB_PROFILE,
+          prefer: 'return=representation',
+          body: [payload]
+        }
+      );
+      const inserted = result?.[0] ?? null;
+      return { ok: true, inserted };
+    }
+
+    if (toolName === 'board_ack') {
+      const body = String(args.body || '').trim();
+      const ids = Array.isArray(args.ids) ? args.ids.map(id => String(id).trim()).filter(Boolean) : [];
+      if (!body) throw new Error('body is required');
+      if (!ids.length) throw new Error('ids is required (at least 1)');
+
+      const now = new Date().toISOString();
+      let acked = 0;
+      for (const id of ids) {
+        // Read current acked_by, merge, write back
+        const rows = await supabaseRequest(
+          `/rest/v1/board_posts?id=eq.${id}&select=id,acked_by`,
+          { profile: DB_PROFILE }
+        );
+        const row = rows?.[0];
+        if (!row) continue;
+        const ackedBy = row.acked_by && typeof row.acked_by === 'object' ? { ...row.acked_by } : {};
+        ackedBy[body] = now;
+        await supabaseRequest(
+          `/rest/v1/board_posts?id=eq.${id}`,
+          {
+            method: 'PATCH',
+            profile: DB_PROFILE,
+            prefer: 'return=minimal',
+            body: { acked_by: ackedBy }
+          }
+        );
+        acked++;
+      }
+      return { ok: true, acked, body };
     }
 
     throw new Error(`Unknown tool: ${name}`);
