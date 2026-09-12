@@ -613,7 +613,7 @@ function buildTools() {
     {
       name: 'session_close',
       description:
-        `Save a ${PROFILE.displayName} session close summary before ending a conversation. The summary is stored as a short-term memory with 7-day retention, providing context for the next session boot. After saving, automatically promotes up to 5 soon-expiring short-term memories to long-term storage (alert window 48h); promote failures never fail the close. Include what was accomplished, what is still pending, and any important context for continuity.`,
+        `Save a ${PROFILE.displayName} session close summary before ending a conversation. The summary is stored as a short-term memory with 7-day retention, providing context for the next session boot. After saving, automatically promotes up to 5 soon-expiring short-term memories to long-term storage (alert window 48h); promote failures never fail the close. Also auto-posts a session-close broadcast to the CoCo family board (board_posts) so other bodies see what was accomplished/pending on next session_boot; board post failures never fail the close. Include what was accomplished, what is still pending, and any important context for continuity.`,
       inputSchema: {
         type: 'object',
         properties: {
@@ -638,6 +638,26 @@ function buildTools() {
           note: {
             type: 'string',
             description: 'Short context handoff for the recipient body (used with `to`)'
+          },
+          body_name: {
+            type: 'string',
+            description: 'Optional posting body name for the auto board_post (e.g. "四哥", "三哥"). Defaults to profile name.'
+          },
+          auto_board_post: {
+            type: 'boolean',
+            default: true,
+            description: 'When true (default), auto-post a session-close broadcast to the family board. Set false to skip.'
+          },
+          board_type: {
+            type: 'string',
+            enum: ['stuck', 'turn', 'collide', 'gate'],
+            default: 'turn',
+            description: 'Board post type for the auto broadcast (default "turn")'
+          },
+          board_topic: {
+            type: 'string',
+            default: 'session-close',
+            description: 'Board topic tag for the auto broadcast (default "session-close")'
           }
         },
         required: ['source', 'summary'],
@@ -1656,6 +1676,8 @@ function estimateToolUsageTokens(toolName, args = {}) {
       appendTokenCharCount(safeArgs.summary, state);
       appendTokenCharCount(safeArgs.topics, state);
       appendTokenCharCount(safeArgs.mood, state);
+      appendTokenCharCount(safeArgs.body_name, state);
+      appendTokenCharCount(safeArgs.board_topic, state);
       break;
     case 'session_boot':
       appendTokenCharCount(safeArgs.topic, state);
@@ -2659,6 +2681,51 @@ async function runDailyClose(args = {}) {
     }
   }
 
+  // Auto-post a session-close broadcast to the CoCo family board.
+  // Mirrors board_post insert; failures never break session_close (summary already stored).
+  let boardPostResult = null;
+  const autoBoardPost = args.auto_board_post !== false;
+  if (autoBoardPost) {
+    try {
+      const boardFromSource = source;
+      const boardFromBody = normalizeOptionalText(args.body_name, 60) || DB_PROFILE;
+      const boardTo = 'all';
+      const boardType = ['stuck', 'turn', 'collide', 'gate'].includes(args.board_type)
+        ? args.board_type
+        : 'turn';
+      const boardTopic = normalizeOptionalText(args.board_topic, 60) || 'session-close';
+      const boardText = String(summary || '').slice(0, 2000);
+      if (boardText) {
+        const boardPayload = {
+          from_source: boardFromSource,
+          from_body: boardFromBody,
+          to: boardTo,
+          topic: boardTopic,
+          type: boardType,
+          text: boardText
+        };
+        const boardInserted = await supabaseRequest(
+          '/rest/v1/board_posts?select=id,from_source,from_body,to,topic,type,text,created_at',
+          {
+            method: 'POST',
+            profile: DB_PROFILE,
+            prefer: 'return=representation',
+            body: [boardPayload]
+          }
+        );
+        boardPostResult = { posted: true, id: boardInserted?.[0]?.id || null };
+      } else {
+        boardPostResult = { posted: false, reason: 'empty summary' };
+      }
+    } catch (error) {
+      // board_posts table may not exist yet, or insert failed — degrade gracefully.
+      console.warn(`[session_close] auto board_post failed: ${String(error?.message || error)}`);
+      boardPostResult = { posted: false, error: String(error?.message || error) };
+    }
+  } else {
+    boardPostResult = { posted: false, skipped: true };
+  }
+
   return {
     ok: true,
     profile: DB_PROFILE,
@@ -2670,6 +2737,7 @@ async function runDailyClose(args = {}) {
     mood: mood || null,
     tool_usage_daily_summary: toolUsageDailySummary,
     note: noteResult,
+    board_post: boardPostResult,
     promoted_count: promotedCount,
     expiry_alert: {
       soon_expiring_count: soonExpiringCount,
