@@ -883,6 +883,19 @@ function buildTools() {
         required: ['body', 'ids'],
         additionalProperties: false
       }
+    },
+    // MARS-327: board_get_full — retrieve full text of a single board post
+    {
+      name: 'board_get_full',
+      description: 'Get the full untruncated text of a single board post. Use when board_read or session_boot shows truncated=true and you need the complete content.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          id: { type: 'string', description: 'Board post UUID' }
+        },
+        required: ['id'],
+        additionalProperties: false
+      }
     }
   ];
 }
@@ -2521,20 +2534,28 @@ async function runDailyBoot(args = {}) {
     bQuery.set('or', `(to.eq.all,to.eq.${boardBody})`);
     const bResult = await supabaseRequest(`/rest/v1/board_posts?${bQuery.toString()}`, { profile: DB_PROFILE });
     const bPosts = Array.isArray(bResult) ? bResult : [];
+    const BOOT_BOARD_PREVIEW_MAX = 160;
     boardUnread = bPosts
       .filter(p => {
         const ab = p.acked_by && typeof p.acked_by === 'object' ? p.acked_by : {};
         return !ab[boardBody];
       })
-      .map(p => ({
-        id: p.id,
-        from: `${p.from_body}@${p.from_source}`,
-        to: p.to,
-        topic: p.topic || null,
-        type: p.type,
-        text: (p.text || '').slice(0, 160),
-        created_at: p.created_at
-      }));
+      .map(p => {
+        const fullText = p.text || '';
+        const preview = fullText.slice(0, BOOT_BOARD_PREVIEW_MAX);
+        return {
+          id: p.id,
+          from: `${p.from_body}@${p.from_source}`,
+          to: p.to,
+          topic: p.topic || null,
+          type: p.type,
+          text: preview,
+          truncated: fullText.length > BOOT_BOARD_PREVIEW_MAX,
+          full_length: fullText.length,
+          preview_length: preview.length,
+          created_at: p.created_at
+        };
+      });
   } catch {
     // board_posts table may not exist yet — degrade gracefully
     boardUnread = [];
@@ -4436,20 +4457,28 @@ async function callTool(name, args = {}) {
             return !ackedBy[body];
           });
 
+      const BOARD_PREVIEW_MAX = 160;
       return {
         ok: true,
         count: filtered.length,
         body,
-        posts: filtered.map(p => ({
-          id: p.id,
-          from: `${p.from_body}@${p.from_source}`,
-          to: p.to,
-          topic: p.topic || null,
-          type: p.type,
-          text: (p.text || '').slice(0, 160),
-          created_at: p.created_at,
-          acked: !!(p.acked_by && p.acked_by[body])
-        }))
+        posts: filtered.map(p => {
+          const fullText = p.text || '';
+          const preview = fullText.slice(0, BOARD_PREVIEW_MAX);
+          return {
+            id: p.id,
+            from: `${p.from_body}@${p.from_source}`,
+            to: p.to,
+            topic: p.topic || null,
+            type: p.type,
+            text: preview,
+            truncated: fullText.length > BOARD_PREVIEW_MAX,
+            full_length: fullText.length,
+            preview_length: preview.length,
+            created_at: p.created_at,
+            acked: !!(p.acked_by && p.acked_by[body])
+          };
+        })
       };
     }
 
@@ -4520,6 +4549,33 @@ async function callTool(name, args = {}) {
         acked++;
       }
       return { ok: true, acked, body };
+    }
+
+    // MARS-327: board_get_full — single post full text retrieval
+    if (toolName === 'board_get_full') {
+      const id = String(args.id || '').trim();
+      if (!id) throw new Error('id is required');
+
+      const query = new URLSearchParams();
+      query.set('id', `eq.${id}`);
+      query.set('select', 'id,from_source,from_body,to,topic,type,text,acked_by,expires_at,archived_at,created_at');
+      const rows = await supabaseRequest(`/rest/v1/board_posts?${query.toString()}`, { profile: DB_PROFILE });
+      const post = rows?.[0];
+      if (!post) throw new Error(`board post not found: ${id}`);
+
+      return {
+        ok: true,
+        post: {
+          id: post.id,
+          from: `${post.from_body}@${post.from_source}`,
+          to: post.to,
+          topic: post.topic || null,
+          type: post.type,
+          text: post.text || '',
+          full_length: (post.text || '').length,
+          created_at: post.created_at
+        }
+      };
     }
 
     throw new Error(`Unknown tool: ${name}`);
