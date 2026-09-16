@@ -2535,6 +2535,8 @@ async function runDailyBoot(args = {}) {
     const bResult = await supabaseRequest(`/rest/v1/board_posts?${bQuery.toString()}`, { profile: DB_PROFILE });
     const bPosts = Array.isArray(bResult) ? bResult : [];
     const BOOT_BOARD_PREVIEW_MAX = 160;
+    // MARS-328: priority types surface first
+    const BOARD_PRIORITY_TYPES = new Set(['gate', 'stuck']);
     boardUnread = bPosts
       .filter(p => {
         const ab = p.acked_by && typeof p.acked_by === 'object' ? p.acked_by : {};
@@ -2555,6 +2557,12 @@ async function runDailyBoot(args = {}) {
           preview_length: preview.length,
           created_at: p.created_at
         };
+      })
+      .sort((a, b) => {
+        const aPri = BOARD_PRIORITY_TYPES.has(a.type) ? 0 : 1;
+        const bPri = BOARD_PRIORITY_TYPES.has(b.type) ? 0 : 1;
+        if (aPri !== bPri) return aPri - bPri;
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
       });
   } catch {
     // board_posts table may not exist yet — degrade gracefully
@@ -2569,6 +2577,8 @@ async function runDailyBoot(args = {}) {
     date: dateKey,
     notes,
     board_unread: boardUnread,
+    // MARS-328: remind body to post stuck/gate when blocked mid-session
+    board_reminder: '中途卡住請用 board_post type=stuck 上墜，唔好等到 session_close。',
     heartbeat_id: savedHeartbeat?.id || null,
     agent_name: queries.agent_name,
     last_topic: previousTopic || null,
@@ -4458,27 +4468,35 @@ async function callTool(name, args = {}) {
           });
 
       const BOARD_PREVIEW_MAX = 160;
+      // MARS-328: gate/stuck surface first
+      const BOARD_READ_PRIORITY_TYPES = new Set(['gate', 'stuck']);
+      const mapped = filtered.map(p => {
+        const fullText = p.text || '';
+        const preview = fullText.slice(0, BOARD_PREVIEW_MAX);
+        return {
+          id: p.id,
+          from: `${p.from_body}@${p.from_source}`,
+          to: p.to,
+          topic: p.topic || null,
+          type: p.type,
+          text: preview,
+          truncated: fullText.length > BOARD_PREVIEW_MAX,
+          full_length: fullText.length,
+          preview_length: preview.length,
+          created_at: p.created_at,
+          acked: !!(p.acked_by && p.acked_by[body])
+        };
+      }).sort((a, b) => {
+        const aPri = BOARD_READ_PRIORITY_TYPES.has(a.type) ? 0 : 1;
+        const bPri = BOARD_READ_PRIORITY_TYPES.has(b.type) ? 0 : 1;
+        if (aPri !== bPri) return aPri - bPri;
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      });
       return {
         ok: true,
-        count: filtered.length,
+        count: mapped.length,
         body,
-        posts: filtered.map(p => {
-          const fullText = p.text || '';
-          const preview = fullText.slice(0, BOARD_PREVIEW_MAX);
-          return {
-            id: p.id,
-            from: `${p.from_body}@${p.from_source}`,
-            to: p.to,
-            topic: p.topic || null,
-            type: p.type,
-            text: preview,
-            truncated: fullText.length > BOARD_PREVIEW_MAX,
-            full_length: fullText.length,
-            preview_length: preview.length,
-            created_at: p.created_at,
-            acked: !!(p.acked_by && p.acked_by[body])
-          };
-        })
+        posts: mapped
       };
     }
 
