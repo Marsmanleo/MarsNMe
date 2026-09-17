@@ -896,6 +896,20 @@ function buildTools() {
         required: ['id'],
         additionalProperties: false
       }
+    },
+    // board_resolve — mark posts as globally resolved
+    {
+      name: 'board_resolve',
+      description: 'Resolve one or more board posts globally. Resolved posts are hidden from board_read and session_boot for ALL bodies (unlike ack which is per-body). Use to close out stuck/gate posts that have been addressed.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          body: { type: 'string', description: 'The body resolving (e.g. "三哥")' },
+          ids: { type: 'array', items: { type: 'string' }, minItems: 1, maxItems: 50, description: 'Board post UUIDs to resolve' }
+        },
+        required: ['body', 'ids'],
+        additionalProperties: false
+      }
     }
   ];
 }
@@ -2531,6 +2545,7 @@ async function runDailyBoot(args = {}) {
     bQuery.set('order', 'created_at.desc');
     bQuery.set('limit', '5');
     bQuery.set('archived_at', 'is.null');
+    bQuery.set('resolved_at', 'is.null');
     bQuery.set('or', `(to.eq.all,to.eq.${boardBody})`);
     const bResult = await supabaseRequest(`/rest/v1/board_posts?${bQuery.toString()}`, { profile: DB_PROFILE });
     const bPosts = Array.isArray(bResult) ? bResult : [];
@@ -2578,7 +2593,7 @@ async function runDailyBoot(args = {}) {
     notes,
     board_unread: boardUnread,
     // MARS-328: remind body to post stuck/gate when blocked mid-session
-    board_reminder: '中途卡住請用 board_post type=stuck 上墜，唔好等到 session_close。',
+    board_reminder: '中途卡住請用 board_post type=stuck 上牆，唔好等到 session_close。',
     heartbeat_id: savedHeartbeat?.id || null,
     agent_name: queries.agent_name,
     last_topic: previousTopic || null,
@@ -4450,6 +4465,7 @@ async function callTool(name, args = {}) {
       query.set('order', 'created_at.desc');
       query.set('limit', String(limit));
       query.set('archived_at', 'is.null');
+      query.set('resolved_at', 'is.null');
       // Wall posts (to=all) + posts addressed to this body
       query.set('or', `(to.eq.all,to.eq.${body})`);
       if (topic) query.set('topic', `eq.${topic}`);
@@ -4534,7 +4550,11 @@ async function callTool(name, args = {}) {
         }
       );
       const inserted = result?.[0] ?? null;
-      return { ok: true, inserted };
+      return {
+        ok: true,
+        inserted,
+        text_length: text.length
+      };
     }
 
     if (toolName === 'board_ack') {
@@ -4545,6 +4565,7 @@ async function callTool(name, args = {}) {
 
       const now = new Date().toISOString();
       let acked = 0;
+      const notFoundIds = [];
       for (const id of ids) {
         // Read current acked_by, merge, write back
         const rows = await supabaseRequest(
@@ -4552,7 +4573,7 @@ async function callTool(name, args = {}) {
           { profile: DB_PROFILE }
         );
         const row = rows?.[0];
-        if (!row) continue;
+        if (!row) { notFoundIds.push(id); continue; }
         const ackedBy = row.acked_by && typeof row.acked_by === 'object' ? { ...row.acked_by } : {};
         ackedBy[body] = now;
         await supabaseRequest(
@@ -4566,7 +4587,39 @@ async function callTool(name, args = {}) {
         );
         acked++;
       }
-      return { ok: true, acked, body };
+      return { ok: true, acked, body, not_found_ids: notFoundIds };
+    }
+
+    // board_resolve — mark posts as globally resolved (hidden for all bodies)
+    if (toolName === 'board_resolve') {
+      const body = String(args.body || '').trim();
+      const ids = Array.isArray(args.ids) ? args.ids.map(id => String(id).trim()).filter(Boolean) : [];
+      if (!body) throw new Error('body is required');
+      if (!ids.length) throw new Error('ids is required (at least 1)');
+
+      const now = new Date().toISOString();
+      let resolved = 0;
+      const notFoundIds = [];
+      for (const id of ids) {
+        const rows = await supabaseRequest(
+          `/rest/v1/board_posts?id=eq.${id}&select=id,resolved_at`,
+          { profile: DB_PROFILE }
+        );
+        const row = rows?.[0];
+        if (!row) { notFoundIds.push(id); continue; }
+        if (row.resolved_at) continue; // already resolved
+        await supabaseRequest(
+          `/rest/v1/board_posts?id=eq.${id}`,
+          {
+            method: 'PATCH',
+            profile: DB_PROFILE,
+            prefer: 'return=minimal',
+            body: { resolved_at: now }
+          }
+        );
+        resolved++;
+      }
+      return { ok: true, resolved, body, not_found_ids: notFoundIds };
     }
 
     // MARS-327: board_get_full — single post full text retrieval
