@@ -2855,6 +2855,15 @@ function evaluatePromotionCandidate(memory, nowTs, longTermTagSet) {
       reason: '已 promoted'
     };
   }
+  // Heartbeat / session_close lifecycle memories should never be promoted —
+  // they contain query strings that pollute recall results with high similarity.
+  if (isLifecycleMemoryRow(memory)) {
+    return {
+      recommend: 'N',
+      score: 0,
+      reason: 'lifecycle memory (heartbeat/session_close) 唔應升級'
+    };
+  }
   const reasons = [];
   let score = 0;
 
