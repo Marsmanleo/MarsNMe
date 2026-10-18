@@ -5,6 +5,7 @@ import { execFileSync } from 'node:child_process';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
+import { shouldRequireBearer as guardShouldRequireBearer } from './lib/auth-guard.mjs';
 
 const PROFILE_CONFIGS = {
   coco: {
@@ -4721,15 +4722,14 @@ function isPublicHost(host) {
 }
 
 function shouldRequireBearer(req) {
-  if (!REQUIRE_BEARER) return false;
-  const host = extractRequestHost(req);
-  if (BYPASS_BEARER_FOR_PRIVATE && isPrivateHost(host)) {
-    return false;
-  }
-  if (isPublicHost(host)) {
-    return true;
-  }
-  return true;
+  // MARS-422: never trust client-supplied X-Forwarded-Host on edge traffic.
+  // See lib/auth-guard.mjs and scripts/tests/test_auth_guard.mjs.
+  return guardShouldRequireBearer({
+    headers: req.headers,
+    remoteAddress: req.socket?.remoteAddress,
+    requireBearer: REQUIRE_BEARER,
+    bypassForPrivate: BYPASS_BEARER_FOR_PRIVATE
+  });
 }
 
 function oauthProtectedResourceMetadata(baseUrl) {
