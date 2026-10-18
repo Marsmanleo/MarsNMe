@@ -9,6 +9,17 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 _No unreleased changes._
 
+## [0.3.1] - 2026-10-19
+
+### Security
+
+- **Fix bearer bypass via `X-Forwarded-Host`** (MARS-422): the private-host bypass
+  trusted the client-supplied header, so any internet client could send
+  `X-Forwarded-Host: 127.0.0.1` and reach every tool with no credentials.
+  The bypass now requires no Cloudflare edge markers (`cf-ray` /
+  `cf-connecting-ip`) **and** a private socket peer (loopback / RFC1918 /
+  IPv6 local). Tests: `marsnme-supabase/scripts/tests/test_auth_guard.mjs`.
+
 ## [0.3.0] - 2026-07-13
 ### Added
 - **3-layer recall**: `recall` returns ~80-char preview snippets per match. New `get_summary` (~300 chars) and `get_full` (complete text) tools let callers drill down by chunk ID instead of token-dumping full chunks on every recall (#98).
