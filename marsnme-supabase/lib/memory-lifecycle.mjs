@@ -31,3 +31,19 @@ export function lifecycleSkipType(tags) {
   }
   return null;
 }
+
+// ── S3: dedupe key ────────────────────────────────────────────────────
+// Must stay byte-compatible with the SQL function coco.normalize_chunk_text():
+// lower → collapse every whitespace run to one space → trim.
+import crypto from 'node:crypto';
+
+export function normalizeChunkText(txt) {
+  return String(txt ?? '')
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+export function normalizedHashForText(txt) {
+  return crypto.createHash('sha256').update(normalizeChunkText(txt), 'utf8').digest('hex');
+}
