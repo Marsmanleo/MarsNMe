@@ -1,0 +1,10 @@
+[Unit]
+Description=Daily MarsNMe memory GC at 03:30 (MARS-522)
+
+[Timer]
+OnCalendar=*-*-* 03:30:00
+Persistent=true
+RandomizedDelaySec=300
+
+[Install]
+WantedBy=timers.target

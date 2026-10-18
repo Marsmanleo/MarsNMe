@@ -1,0 +1,8 @@
+[Unit]
+Description=MarsNMe CoCo memory GC (MARS-522)
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/opt/mars-memory-mcp/scripts/gc_run.sh
