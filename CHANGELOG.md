@@ -9,6 +9,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 _No unreleased changes._
 
+## [0.3.2] - 2026-10-19
+
+### Fixed
+
+- **0.3.1 was unusable**: `server.mjs` imports `./lib/auth-guard.mjs`, but `files`
+  did not include `lib/`, so the published tarball was missing it and every
+  install crashed with `ERR_MODULE_NOT_FOUND`.
+- `files` now includes `lib/`.
 ## [0.3.1] - 2026-10-19
 
 ### Security
