@@ -6,6 +6,7 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { shouldRequireBearer as guardShouldRequireBearer } from './lib/auth-guard.mjs';
+import { lifecycleSkipType, normalizedHashForText } from './lib/memory-lifecycle.mjs';
 
 const PROFILE_CONFIGS = {
   coco: {
@@ -3313,6 +3314,19 @@ async function runBatchPromote(args = {}) {
         });
         continue;
       }
+      // MARS-522: explicit ids get the same lifecycle filter as auto-detected ones.
+      const explicitSkipType = lifecycleSkipType(normalizeTags(memory.tags));
+      if (explicitSkipType) {
+        candidates.push({
+          id: memoryId,
+          status: 'skip_type',
+          skipped: true,
+          reason: 'skip_type',
+          type: explicitSkipType,
+          excerpt: String(memory.body || '').slice(0, 140)
+        });
+        continue;
+      }
       candidates.push({
         id: memoryId,
         status: 'eligible',
@@ -3336,6 +3350,20 @@ async function runBatchPromote(args = {}) {
       const memory = await fetchMemoryById(item.id);
       if (!memory) {
         candidates.push({ id: item.id, status: 'not_found', skipped: true });
+        continue;
+      }
+      // MARS-522: lifecycle memories (heartbeat / session_* / auto-recovery) are
+      // operational noise; promoting them is what bloated marsvault_chunks.
+      const skipType = lifecycleSkipType(normalizeTags(memory.tags));
+      if (skipType) {
+        candidates.push({
+        id: item.id,
+        status: 'skip_type',
+        skipped: true,
+        reason: 'skip_type',
+        type: skipType,
+        excerpt: item.excerpt || String(memory.body || '').slice(0, 140)
+        });
         continue;
       }
       candidates.push({
@@ -3789,7 +3817,6 @@ async function ingestMarsvaultChunks(args = {}, options = {}) {
   const mergedTagSet = new Set([...fixedTags, ...baseTags]);
   const tags = normalizeMemoryTagsWithContext(Array.from(mergedTagSet), agentBody, environment);
   const rows = [];
-
   for (let index = 0; index < chunkTexts.length; index += 1) {
     const chunkText = chunkTexts[index];
     const embedding = await createJinaEmbedding(chunkText, 'retrieval.passage');
@@ -3807,6 +3834,7 @@ async function ingestMarsvaultChunks(args = {}, options = {}) {
       type,
       date,
       content_hash: contentHash,
+      normalized_hash: normalizedHashForText(chunkText),
       origin,
       source_memory_id: sourceMemoryId,
       source_session_id: sourceSessionId,
@@ -3817,20 +3845,49 @@ async function ingestMarsvaultChunks(args = {}, options = {}) {
     });
   }
 
-  const insertedRows = await supabaseRequest(
-    '/rest/v1/marsvault_chunks?on_conflict=source_file,section,content_hash,body&select=id,source_file,section,body,visibility,type,date,origin,source_memory_id,source_session_id,source_tool,source_user_note,agent_body,environment,created_at,updated_at',
-    {
-      method: 'POST',
-      profile: DB_PROFILE,
-      prefer: 'resolution=merge-duplicates,return=representation',
-      body: rows
+  // MARS-522 (S3): identical text arriving via a different source_file/section used to be
+  // inserted again (the unique key is scoped to source_file+section). Collapse on
+  // normalized_hash instead: bump dup_count on the existing row and skip the insert.
+  const hashes = rows.map((row) => row.normalized_hash).filter(Boolean);
+  let duplicateCount = 0;
+  let rowsToInsert = rows;
+  if (hashes.length > 0) {
+    const hashFilter = `in.(${hashes.map((h) => `"${h}"`).join(',')})`;
+    const existing = await supabaseRequest(
+      `/rest/v1/marsvault_chunks?select=normalized_hash&normalized_hash=${hashFilter}`,
+      { profile: DB_PROFILE }
+    );
+    const existingSet = new Set(
+      (Array.isArray(existing) ? existing : []).map((row) => row.normalized_hash).filter(Boolean)
+    );
+    if (existingSet.size > 0) {
+      await supabaseRequest('/rest/v1/rpc/bump_chunk_dup_count', {
+        method: 'POST',
+        profile: DB_PROFILE,
+        body: { hashes: Array.from(existingSet) }
+      });
+      rowsToInsert = rows.filter((row) => !existingSet.has(row.normalized_hash));
+      duplicateCount = rows.length - rowsToInsert.length;
     }
-  );
+  }
+
+  const insertedRows = rowsToInsert.length === 0
+    ? []
+    : await supabaseRequest(
+      '/rest/v1/marsvault_chunks?on_conflict=source_file,section,content_hash,body&select=id,source_file,section,body,visibility,type,date,origin,source_memory_id,source_session_id,source_tool,source_user_note,agent_body,environment,created_at,updated_at',
+      {
+        method: 'POST',
+        profile: DB_PROFILE,
+        prefer: 'resolution=merge-duplicates,return=representation',
+        body: rowsToInsert
+      }
+    );
 
   return {
     ok: true,
     chunk_count: chunkTexts.length,
     inserted_count: Array.isArray(insertedRows) ? insertedRows.length : 0,
+      duplicate_count: duplicateCount,
     source_file: sourceFile,
     section_prefix: sectionPrefix,
     body: normalizedBody,
