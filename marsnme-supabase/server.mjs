@@ -3462,6 +3462,20 @@ async function runBatchPromote(args = {}) {
   };
 }
 
+// MARS-522 (S4): GC visibility for health_check.
+async function fetchMemoryGcStatus() {
+  try {
+    const rows = await supabaseRequest('/rest/v1/rpc/memory_gc_status', {
+      method: 'POST',
+      profile: DB_PROFILE,
+      body: {}
+    });
+    return Array.isArray(rows) ? rows[0] : rows;
+  } catch (error) {
+    return { error: normalizeOptionalText(error?.message || String(error), 200) };
+  }
+}
+
 async function runHealthCheck(args = {}) {
   const alertWindowHours = clampInteger(args.alert_window_hours, 1, 720, 48);
   const gapDays = clampInteger(args.gap_days, 7, 365, 30);
@@ -3619,6 +3633,7 @@ async function runHealthCheck(args = {}) {
     ok: true,
     profile: DB_PROFILE,
     generated_at: nowTs.toISOString(),
+    memory_gc: await fetchMemoryGcStatus(),
     count_chunks: {
       total_chunks: chunkRows.length,
       monthly_distribution: monthlyDistribution,
