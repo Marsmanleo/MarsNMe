@@ -6,6 +6,7 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { shouldRequireBearer as guardShouldRequireBearer } from './lib/auth-guard.mjs';
+import { lifecycleSkipType } from './lib/memory-lifecycle.mjs';
 
 const PROFILE_CONFIGS = {
   coco: {
@@ -3313,6 +3314,19 @@ async function runBatchPromote(args = {}) {
         });
         continue;
       }
+      // MARS-522: explicit ids get the same lifecycle filter as auto-detected ones.
+      const explicitSkipType = lifecycleSkipType(normalizeTags(memory.tags));
+      if (explicitSkipType) {
+        candidates.push({
+          id: memoryId,
+          status: 'skip_type',
+          skipped: true,
+          reason: 'skip_type',
+          type: explicitSkipType,
+          excerpt: String(memory.body || '').slice(0, 140)
+        });
+        continue;
+      }
       candidates.push({
         id: memoryId,
         status: 'eligible',
@@ -3336,6 +3350,20 @@ async function runBatchPromote(args = {}) {
       const memory = await fetchMemoryById(item.id);
       if (!memory) {
         candidates.push({ id: item.id, status: 'not_found', skipped: true });
+        continue;
+      }
+      // MARS-522: lifecycle memories (heartbeat / session_* / auto-recovery) are
+      // operational noise; promoting them is what bloated marsvault_chunks.
+      const skipType = lifecycleSkipType(normalizeTags(memory.tags));
+      if (skipType) {
+        candidates.push({
+        id: item.id,
+        status: 'skip_type',
+        skipped: true,
+        reason: 'skip_type',
+        type: skipType,
+        excerpt: item.excerpt || String(memory.body || '').slice(0, 140)
+        });
         continue;
       }
       candidates.push({
