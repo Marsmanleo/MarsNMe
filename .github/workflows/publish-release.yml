@@ -4,6 +4,11 @@ on:
   push:
     tags:
       - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing release tag to publish (e.g. v0.3.1)"
+        required: true
 
 permissions:
   contents: read
@@ -13,8 +18,17 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     steps:
+      - name: Resolve tag
+        id: tag
+        run: |
+          TAG="${{ inputs.tag || github.ref_name }}"
+          echo "name=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+
       - name: Checkout
         uses: actions/checkout@v5
+        with:
+          ref: ${{ steps.tag.outputs.name }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v6
@@ -24,16 +38,40 @@ jobs:
 
       - name: Verify tag version matches package version
         run: |
-          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          TAG_VERSION="${{ steps.tag.outputs.version }}"
           PKG_VERSION=$(node -p "require('./marsnme-supabase/package.json').version")
           if [ "$TAG_VERSION" != "$PKG_VERSION" ]; then
             echo "Tag version ($TAG_VERSION) does not match marsnme-supabase/package.json version ($PKG_VERSION)"
             exit 1
           fi
 
+      # Idempotent: re-running for an already published version must not fail,
+      # otherwise a failed MCP Registry step can never be retried.
       - name: Publish to npm (Trusted Publishing)
         working-directory: marsnme-supabase
-        run: npm publish --access public
+        run: |
+          V=$(node -p "require('./package.json').version")
+          if npm view "@marsnme/mcp-gateway@${V}" version >/dev/null 2>&1; then
+            echo "@marsnme/mcp-gateway@${V} already on npm — skipping publish"
+          else
+            npm publish --access public
+          fi
+
+      # The MCP Registry rejects a version npm has not exposed yet (400 / 404).
+      # npm reports success before the registry serves the new version, so wait.
+      - name: Wait for npm to expose the version
+        run: |
+          V=$(node -p "require('./marsnme-supabase/package.json').version")
+          for i in $(seq 1 20); do
+            if npm view "@marsnme/mcp-gateway@${V}" version >/dev/null 2>&1; then
+              echo "npm exposes ${V}"
+              exit 0
+            fi
+            echo "waiting for npm to expose ${V} ($i/20)"
+            sleep 15
+          done
+          echo "npm never exposed ${V}" >&2
+          exit 1
 
       - name: Install mcp-publisher
         run: |
@@ -41,9 +79,8 @@ jobs:
 
       - name: Sync server.json version from tag
         env:
-          TAG_NAME: ${{ github.ref_name }}
+          VERSION: ${{ steps.tag.outputs.version }}
         run: |
-          export VERSION="${TAG_NAME#v}"
           node -e 'const fs=require("fs"); const p="server.json"; const v=process.env.VERSION; const j=JSON.parse(fs.readFileSync(p,"utf8")); j.version=v; if (Array.isArray(j.packages)) j.packages=j.packages.map(x=>({...x,version:v})); fs.writeFileSync(p, JSON.stringify(j,null,2)+"\n");'
 
       - name: Publish to MCP Registry
